@@ -1,0 +1,45 @@
+{
+  "data_path": "c:\\Jon\\College\\Thesis\\V2.2.1.1\\merged_clinical_dietary_leftjoin.csv",
+  "target_col": "Hypertension",
+  "target_defined_from_bp": true,
+  "bp_leakage_guard_active": true,
+  "bp_dropped_columns": [
+    "Ave_DBP",
+    "Ave_SBP"
+  ],
+  "models_trained": [
+    "log_reg",
+    "knn",
+    "naive_bayes",
+    "random_forest",
+    "xgboost",
+    "catboost",
+    "adaboost",
+    "lightgbm"
+  ],
+  "stage1_trials_per_model": 80,
+  "stage2_refinements_per_top_config": 18,
+  "top_k_stage1": 8,
+  "top_k_stage2": 3,
+  "epochs": {
+    "stage1": 25,
+    "stage2": 80,
+    "final": 300
+  },
+  "cv_folds": {
+    "stage1": 5,
+    "stage2": 5,
+    "stack_oof": 5
+  },
+  "stack_search": {
+    "meta_trials": 200,
+    "blend_trials": 3000,
+    "top_base_models": 6
+  },
+  "best_stack_strategy": "weighted_blend",
+  "best_stack_calibration": "base",
+  "collinearity_cutoff": 0.7,
+  "final_feature_count": 29,
+  "best_model": "lightgbm",
+  "best_calibration": "base"
+}

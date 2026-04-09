@@ -1,0 +1,15 @@
+{
+  "best_model": "CatBoost",
+  "best_strategy": "adasyn",
+  "calibration_method": "sigmoid",
+  "selection_priority": "highest_recall_then_accuracy",
+  "test_accuracy": 0.7578817408174964,
+  "test_precision": 0.6207951070336392,
+  "test_recall": 0.7189139559286464,
+  "test_f1": 0.6662614720719625,
+  "test_auc": 0.8282396384644899,
+  "test_logloss": 0.46691749648979297,
+  "test_ece": 0.013027983718360803,
+  "base_model_path": "c:\\Jon\\College\\Thesis\\V2.2.1.1\\main_2015_training_artifacts\\models\\CatBoost__adasyn__gridsearch_best.joblib",
+  "final_calibrated_model_path": "c:\\Jon\\College\\Thesis\\V2.2.1.1\\main_2015_training_artifacts\\models\\final_best_CatBoost__adasyn__sigmoid.joblib"
+}

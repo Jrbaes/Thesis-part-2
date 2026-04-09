@@ -1,0 +1,13 @@
+model_name,method,cal_logloss,cal_ece,cal_auc,cal_f1,model_path,logloss_rank,ece_rank,avg_rank
+LogReg,none,0.655582657411171,0.1598566602353666,0.6591337535356998,0.5090176421445771,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\LogReg.joblib,12.0,12.0,12.0
+LogReg,sigmoid,0.5983980568085969,0.019328400286428803,0.6591337535356998,0.25922701949860727,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\LogReg.joblib,10.0,8.0,9.0
+LogReg,isotonic,0.5977749610891291,0.00797469844059133,0.6587597159245362,0.19730856709628505,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\LogReg.joblib,8.0,5.0,6.5
+LogReg,venn_abers,0.5982126040403056,0.008372787184969744,0.6587774045089041,0.1974793897469914,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\LogReg.joblib,9.0,6.0,7.5
+RandomForest,none,0.6004254774232495,0.028290554831768257,0.6657579274861596,0.32267646369108105,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\RandomForest.joblib,11.0,11.0,11.0
+RandomForest,sigmoid,0.5964528970959277,0.02456895097693519,0.6657579274861596,0.20377568017767908,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\RandomForest.joblib,7.0,10.0,8.5
+RandomForest,isotonic,0.5941084464505832,0.004650618046025307,0.6654100650599526,0.30806142034548945,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\RandomForest.joblib,5.0,2.0,3.5
+RandomForest,venn_abers,0.5942034424994522,0.004453551032161012,0.6653845072604894,0.3086390154239591,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\RandomForest.joblib,6.0,1.0,3.5
+XGBoost,none,0.5854743843635041,0.012122988827971155,0.6811251489328172,0.30382935841451125,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\XGBoost.joblib,1.0,7.0,4.0
+XGBoost,sigmoid,0.587446344928016,0.02315409976166875,0.6811251489328172,0.3095,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\XGBoost.joblib,3.0,9.0,6.0
+XGBoost,isotonic,0.5875586277792373,0.005923080492296684,0.6810110600135872,0.2671857029107317,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\XGBoost.joblib,4.0,4.0,4.0
+XGBoost,venn_abers,0.585613087593638,0.0058265677152437075,0.6810713220642646,0.26716206652512386,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\XGBoost.joblib,2.0,3.0,2.5

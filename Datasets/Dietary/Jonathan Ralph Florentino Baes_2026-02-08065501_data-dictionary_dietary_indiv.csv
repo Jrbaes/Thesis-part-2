@@ -1,0 +1,207 @@
+formno,variable_name,variable_label,var_value,value_label
+form61_2018,regcode,Name of Regions,1,Region I (Ilocos Region)
+form61_2018,regcode,Name of Regions,2,Region II (Cagayan Valley)
+form61_2018,regcode,Name of Regions,3,Region III (Central Luzon)
+form61_2018,regcode,Name of Regions,41,Region IV-A (CALABARZON)
+form61_2018,regcode,Name of Regions,42,Region IV-B (MIMAROPA)
+form61_2018,regcode,Name of Regions,5,Region V (Bicol Region)
+form61_2018,regcode,Name of Regions,6,Region VI (Western Visayas)
+form61_2018,regcode,Name of Regions,7,Region VII (Central Visayas)
+form61_2018,regcode,Name of Regions,8,Region VIII (Eastern Visayas)
+form61_2018,regcode,Name of Regions,9,Region IX (Zamboanga Peninsula)
+form61_2018,regcode,Name of Regions,10,Region X (Northern Mindanao)
+form61_2018,regcode,Name of Regions,11,Region XI (Davao Region)
+form61_2018,regcode,Name of Regions,12,Region XII (SOCCSKSARGEN)
+form61_2018,regcode,Name of Regions,13,National Capital Region (NCR)
+form61_2018,regcode,Name of Regions,14,Cordillera Administrative Region (CAR)
+form61_2018,regcode,Name of Regions,15,Autonomous Region In Muslim Mindanao (ARMM)
+form61_2018,regcode,Name of Regions,16,Region XIII (CARAGA)
+form61_2018,provhuc,Province and HUCs Level,1,Ilocos Norte
+form61_2018,provhuc,Province and HUCs Level,2,Ilocos Sur
+form61_2018,provhuc,Province and HUCs Level,3,La Union
+form61_2018,provhuc,Province and HUCs Level,4,Pangasinan
+form61_2018,provhuc,Province and HUCs Level,5,Batanes
+form61_2018,provhuc,Province and HUCs Level,6,Cagayan Province
+form61_2018,provhuc,Province and HUCs Level,7,Isabela Province
+form61_2018,provhuc,Province and HUCs Level,8,Nueva Vizcaya
+form61_2018,provhuc,Province and HUCs Level,9,Quirino
+form61_2018,provhuc,Province and HUCs Level,10,Bataan
+form61_2018,provhuc,Province and HUCs Level,11,Bulacan
+form61_2018,provhuc,Province and HUCs Level,12,Nueva Ecija
+form61_2018,provhuc,Province and HUCs Level,13,Angeles City
+form61_2018,provhuc,Province and HUCs Level,14,Pampanga
+form61_2018,provhuc,Province and HUCs Level,15,Tarlac
+form61_2018,provhuc,Province and HUCs Level,16,Zambales
+form61_2018,provhuc,Province and HUCs Level,17,Olongapo City
+form61_2018,provhuc,Province and HUCs Level,18,Aurora
+form61_2018,provhuc,Province and HUCs Level,19,Batangas
+form61_2018,provhuc,Province and HUCs Level,20,Cavite
+form61_2018,provhuc,Province and HUCs Level,21,Laguna
+form61_2018,provhuc,Province and HUCs Level,22,Quezon Province
+form61_2018,provhuc,Province and HUCs Level,23,Lucena City
+form61_2018,provhuc,Province and HUCs Level,24,Rizal
+form61_2018,provhuc,Province and HUCs Level,25,Marinduque
+form61_2018,provhuc,Province and HUCs Level,26,Occidental Mindoro
+form61_2018,provhuc,Province and HUCs Level,27,Oriental Mindoro
+form61_2018,provhuc,Province and HUCs Level,28,Palawan
+form61_2018,provhuc,Province and HUCs Level,29,Puerto Princesa City
+form61_2018,provhuc,Province and HUCs Level,30,Romblon
+form61_2018,provhuc,Province and HUCs Level,31,Albay
+form61_2018,provhuc,Province and HUCs Level,32,Camarines Norte
+form61_2018,provhuc,Province and HUCs Level,33,Camarines Sur
+form61_2018,provhuc,Province and HUCs Level,34,Catanduanes
+form61_2018,provhuc,Province and HUCs Level,35,Masbate
+form61_2018,provhuc,Province and HUCs Level,36,Sorsogon
+form61_2018,provhuc,Province and HUCs Level,37,Aklan
+form61_2018,provhuc,Province and HUCs Level,38,Antique
+form61_2018,provhuc,Province and HUCs Level,39,Capiz
+form61_2018,provhuc,Province and HUCs Level,40,Iloilo City
+form61_2018,provhuc,Province and HUCs Level,41,Iloilo Province
+form61_2018,provhuc,Province and HUCs Level,42,Bacolod City
+form61_2018,provhuc,Province and HUCs Level,43,Negros Occidental
+form61_2018,provhuc,Province and HUCs Level,44,Guimaras
+form61_2018,provhuc,Province and HUCs Level,45,Bohol
+form61_2018,provhuc,Province and HUCs Level,46,Mandaue City
+form61_2018,provhuc,Province and HUCs Level,47,Lapu-Lapu City (Opon)
+form61_2018,provhuc,Province and HUCs Level,48,Cebu
+form61_2018,provhuc,Province and HUCs Level,49,Cebu City
+form61_2018,provhuc,Province and HUCs Level,50,Negros Oriental
+form61_2018,provhuc,Province and HUCs Level,51,Siquijor
+form61_2018,provhuc,Province and HUCs Level,52,Eastern Samar
+form61_2018,provhuc,Province and HUCs Level,53,Tacloban City
+form61_2018,provhuc,Province and HUCs Level,54,Leyte
+form61_2018,provhuc,Province and HUCs Level,55,Northern Samar
+form61_2018,provhuc,Province and HUCs Level,56,Western Samar
+form61_2018,provhuc,Province and HUCs Level,57,Southern Leyte
+form61_2018,provhuc,Province and HUCs Level,58,Biliran
+form61_2018,provhuc,Province and HUCs Level,59,Zamboanga del Norte
+form61_2018,provhuc,Province and HUCs Level,60,Zamboanga City
+form61_2018,provhuc,Province and HUCs Level,61,Zamboanga Del Sur
+form61_2018,provhuc,Province and HUCs Level,62,Zamboanga Sibugay
+form61_2018,provhuc,Province and HUCs Level,63,City of Isabela
+form61_2018,provhuc,Province and HUCs Level,64,Bukidnon
+form61_2018,provhuc,Province and HUCs Level,65,Camiguin
+form61_2018,provhuc,Province and HUCs Level,66,Lanao Del Norte
+form61_2018,provhuc,Province and HUCs Level,67,Iligan City
+form61_2018,provhuc,Province and HUCs Level,68,Misamis Occidental
+form61_2018,provhuc,Province and HUCs Level,69,Cagayan De Oro
+form61_2018,provhuc,Province and HUCs Level,70,Misamis Oriental
+form61_2018,provhuc,Province and HUCs Level,71,Davao Del Norte
+form61_2018,provhuc,Province and HUCs Level,72,Davao City
+form61_2018,provhuc,Province and HUCs Level,73,Davao Del Sur
+form61_2018,provhuc,Province and HUCs Level,74,Davao Oriental
+form61_2018,provhuc,Province and HUCs Level,75,Compostela Valley
+form61_2018,provhuc,Province and HUCs Level,76,Davao Occidental
+form61_2018,provhuc,Province and HUCs Level,77,North Cotabato
+form61_2018,provhuc,Province and HUCs Level,78,South Cotabato
+form61_2018,provhuc,Province and HUCs Level,79,General Santos City
+form61_2018,provhuc,Province and HUCs Level,80,Sultan Kudarat
+form61_2018,provhuc,Province and HUCs Level,81,Sarangani
+form61_2018,provhuc,Province and HUCs Level,82,Cotabato City
+form61_2018,provhuc,Province and HUCs Level,83,City of Manila
+form61_2018,provhuc,Province and HUCs Level,84,Mandaluyong City
+form61_2018,provhuc,Province and HUCs Level,85,San Juan City
+form61_2018,provhuc,Province and HUCs Level,86,Quezon City
+form61_2018,provhuc,Province and HUCs Level,87,City Of Marikina
+form61_2018,provhuc,Province and HUCs Level,88,City of Pasig
+form61_2018,provhuc,Province and HUCs Level,89,Caloocan City
+form61_2018,provhuc,Province and HUCs Level,90,City Of Malabon
+form61_2018,provhuc,Province and HUCs Level,91,City of Navotas
+form61_2018,provhuc,Province and HUCs Level,92,City of Valenzuela
+form61_2018,provhuc,Province and HUCs Level,93,Makati City
+form61_2018,provhuc,Province and HUCs Level,94,Taguig City
+form61_2018,provhuc,Province and HUCs Level,95,Las Pi?as City
+form61_2018,provhuc,Province and HUCs Level,96,City Of Para?aque
+form61_2018,provhuc,Province and HUCs Level,97,Pateros
+form61_2018,provhuc,Province and HUCs Level,98,City of Muntinlupa
+form61_2018,provhuc,Province and HUCs Level,99,Pasay City
+form61_2018,provhuc,Province and HUCs Level,100,Abra
+form61_2018,provhuc,Province and HUCs Level,101,Baguio
+form61_2018,provhuc,Province and HUCs Level,102,Benguet
+form61_2018,provhuc,Province and HUCs Level,103,Ifugao
+form61_2018,provhuc,Province and HUCs Level,104,Kalinga
+form61_2018,provhuc,Province and HUCs Level,105,Mountain Province
+form61_2018,provhuc,Province and HUCs Level,106,Apayao
+form61_2018,provhuc,Province and HUCs Level,107,Basilan
+form61_2018,provhuc,Province and HUCs Level,108,Lanao Del Sur
+form61_2018,provhuc,Province and HUCs Level,109,Maguindanao
+form61_2018,provhuc,Province and HUCs Level,110,Tawi-Tawi
+form61_2018,provhuc,Province and HUCs Level,111,Butuan City
+form61_2018,provhuc,Province and HUCs Level,112,Agusan Del Norte
+form61_2018,provhuc,Province and HUCs Level,113,Agusan Del Sur
+form61_2018,provhuc,Province and HUCs Level,114,Surigao Del Norte
+form61_2018,provhuc,Province and HUCs Level,115,Surigao Del Sur
+form61_2018,provhuc,Province and HUCs Level,116,Dinagat Islands
+form61_2018,enns_year,Expanded National Nutrition Survey Year,,
+form61_2018,hhnum,Household Number (Merging variable/Unique household identifier),,
+form61_2018,member_code,Member Code (Merging variable/Unique identifier),,
+form61_2018,fwgti_natl2_var,National Sampling Weights,,
+form61_2018,fwgti_prov2,Provincial Sampling Weights,,
+form61_2018,rep_natl,ENNS Replicate Codes,,
+form61_2018,rep_prov,MS Replicate Codes,,
+form61_2018,ms_psucode,Primary Sampling Unit Number,,
+form61_2018,fg1,Cereals and Cereal Products as purchased (in grams),,
+form61_2018,fg2,Rice and Products as purchased (in grams),,
+form61_2018,fg3,Corn and Products as purchased (in grams),,
+form61_2018,fg4,Other Cereal Products as purchased (in grams),,
+form61_2018,fg5,Starchy Roots and Tubers as purchased (in grams),,
+form61_2018,fg6,Sugar and Syrups as purchased (in grams),,
+form61_2018,fg7,Dried Beans, Nuts and Seeds as purchased (in grams),,
+form61_2018,fg8,Vegetables as purchased (in grams),,
+form61_2018,fg9,Green Leafy and Yellow as purchased (in grams),,
+form61_2018,fg10,Other Vegetables as purchased (in grams),,
+form61_2018,fg11,Fruits as purchased (in grams),,
+form61_2018,fg12,Vitamin C-Rich Fruits as purchased (in grams),,
+form61_2018,fg13,Other Fruits as purchased (in grams),,
+form61_2018,fg14,Fish, Meat and Poultry as purchased (in grams),,
+form61_2018,fg15,Fish and Fish Products as purchased (in grams),,
+form61_2018,fg16,Meat and Meat Products as purchased (in grams),,
+form61_2018,fg17,Poultry as purchased (in grams),,
+form61_2018,fg18,Eggs as purchased (in grams),,
+form61_2018,fg19,Milk and Milk Products as purchased (in grams),,
+form61_2018,fg20,Whole Milk as purchased (in grams),,
+form61_2018,fg21,Milk Products as purchased (in grams),,
+form61_2018,fg23,Fats and Oils as purchased (in grams),,
+form61_2018,fg24,Miscellaneous as purchased (in grams),,
+form61_2018,fg25,Beverages as purchased (in grams),,
+form61_2018,fg26,Condiments and Spices as purchased (in grams),,
+form61_2018,fg27,Other Miscellaneous as purchased (in grams),,
+form61_2018,epwt_fg1,Cereals and Cereal Products edible portion (in grams),,
+form61_2018,epwt_fg2,Rice and Products edible portion (in grams),,
+form61_2018,epwt_fg3,Corn and Products edible portion (in grams),,
+form61_2018,epwt_fg4,Other Cereal Products edible portion (in grams),,
+form61_2018,epwt_fg5,Starchy Roots and Tubers edible portion (in grams),,
+form61_2018,epwt_fg6,Sugar and Syrups edible portion (in grams),,
+form61_2018,epwt_fg7,Dried Beans, Nuts and Seeds edible portion (in grams),,
+form61_2018,epwt_fg8,Vegetables edible portion (in grams),,
+form61_2018,epwt_fg9,Green Leafy and Yellow edible portion (in grams),,
+form61_2018,epwt_fg10,Other Vegetables edible portion (in grams),,
+form61_2018,epwt_fg11,Fruits edible portion (in grams),,
+form61_2018,epwt_fg12,Vitamin C-Rich Fruits edible portion (in grams),,
+form61_2018,epwt_fg13,Other Fruits edible portion (in grams),,
+form61_2018,epwt_fg14,Fish, Meat and Poultry edible portion (in grams),,
+form61_2018,epwt_fg15,Fish and Fish Products edible portion (in grams),,
+form61_2018,epwt_fg16,Meat and Meat Products edible portion (in grams),,
+form61_2018,epwt_fg17,Poultry edible portion (in grams),,
+form61_2018,epwt_fg18,Eggs edible portion (in grams),,
+form61_2018,epwt_fg19,Milk and Milk Products edible portion (in grams),,
+form61_2018,epwt_fg20,Whole Milk edible portion (in grams),,
+form61_2018,epwt_fg21,Milk Products edible portion (in grams),,
+form61_2018,epwt_fg23,Fats and Oils edible portion (in grams),,
+form61_2018,epwt_fg24,Miscellaneous edible portion (in grams),,
+form61_2018,epwt_fg25,Beverages edible portion (in grams),,
+form61_2018,epwt_fg26,Condiments and Spices edible portion (in grams),,
+form61_2018,epwt_fg27,Other Miscellaneous edible portion (in grams),,
+form61_2018,Total_Food,Total Food Intake (in grams),,
+form61_2018,Total_Food_epwt,Total Food Intake (in grams),,
+form61_2018,Total_Ener,Total Energy (Kcal),,
+form61_2018,Total_Prot,Total Protein (g),,
+form61_2018,Total_Calc,Total Calcium (mg),,
+form61_2018,Total_Iron,Total Iron (mg),,
+form61_2018,Total_VitA,Total Vitamin A (mcg),,
+form61_2018,Total_VitC,Total Vitamin C (mg),,
+form61_2018,Total_Thia,Total Thiamin (mg),,
+form61_2018,Total_Ribo,Total Riboflavin (mg),,
+form61_2018,Total_Nia,Total Niacin (mg),,
+form61_2018,Total_CHO,Total Carbohydrates (g),,
+form61_2018,Total_Fat,Total Fats (g),,

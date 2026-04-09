@@ -1,0 +1,13 @@
+{
+  "best_model": "lightgbm",
+  "calibration_method": "base",
+  "selection_cal_logloss": 0.46362791246947105,
+  "selection_cal_ece": 0.011309675054077779,
+  "test_accuracy": 0.750606287755192,
+  "test_precision": 0.6126115815976196,
+  "test_recall": 0.702124868835257,
+  "test_f1": 0.654320987654321,
+  "test_auc": 0.8184135129917132,
+  "test_logloss": 0.47567434379059936,
+  "test_ece": 0.00770833351268341
+}

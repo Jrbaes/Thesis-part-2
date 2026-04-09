@@ -1,0 +1,10 @@
+{
+  "best_model": "XGBoost",
+  "calibration_method": "venn_abers",
+  "test_accuracy": 0.6853059367654863,
+  "test_precision": 0.5602649006622517,
+  "test_recall": 0.17176170311502986,
+  "test_f1": 0.2629195524773575,
+  "test_auc": 0.6823134093842338,
+  "test_logloss": 0.5851121301805506
+}

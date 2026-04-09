@@ -1,0 +1,29 @@
+{
+  "best_strategy": "S40_adult_specialist",
+  "best_model": "XGB_bal",
+  "best_threshold": 0.43,
+  "best_test_metrics": {
+    "accuracy": 0.6705762764876065,
+    "recall": 0.8102264426588751,
+    "f1": 0.7247304802352172,
+    "precision": 0.6555555555555556,
+    "auc": 0.7244319148183139,
+    "threshold": 0.43,
+    "dual_min": 0.6705762764876065
+  },
+  "bootstrap_summary": {
+    "accuracy_mean": 0.6703374644877108,
+    "recall_mean": 0.8101159630225635,
+    "f1_mean": 0.7244743006863174,
+    "dual_min_mean": 0.6703374644877108,
+    "accuracy_ci95_low": 0.66189694268512,
+    "accuracy_ci95_high": 0.6792575650950036,
+    "recall_ci95_low": 0.8002595033153913,
+    "recall_ci95_high": 0.8190626540677156,
+    "f1_ci95_low": 0.7162309889720134,
+    "f1_ci95_high": 0.7329957999110311,
+    "dual_min_ci95_low": 0.66189694268512,
+    "dual_min_ci95_high": 0.6792575650950036,
+    "dual_target_hit_rate": 0.0
+  }
+}

@@ -1,0 +1,641 @@
+model_name,sampling,model_path,calibration,best_threshold_from_cal,cal_accuracy,cal_recall,cal_f1,test_accuracy,test_recall,test_f1,test_precision,test_min_acc_rec_f1,meets_0_90_all,error
+XGBoost,smote_class_weight,models\XGBoost__smote_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,smote_class_weight,models\XGBoost__smote_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,smote_class_weight,models\XGBoost__smote_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,adasyn_class_weight,models\XGBoost__adasyn_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,adasyn_class_weight,models\XGBoost__adasyn_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,adasyn_class_weight,models\XGBoost__adasyn_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,smote_class_weight,models\CatBoost__smote_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,smote_class_weight,models\CatBoost__smote_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,smote_class_weight,models\CatBoost__smote_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,adasyn_class_weight,models\CatBoost__adasyn_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,adasyn_class_weight,models\CatBoost__adasyn_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,adasyn_class_weight,models\CatBoost__adasyn_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,adasyn_class_weight,models\RandomForest__adasyn_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,adasyn_class_weight,models\RandomForest__adasyn_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,adasyn_class_weight,models\RandomForest__adasyn_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,class_weight,models\CatBoost__class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,class_weight,models\CatBoost__class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+CatBoost,class_weight,models\CatBoost__class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,class_weight,models\XGBoost__class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,class_weight,models\RandomForest__class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,class_weight,models\RandomForest__class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,class_weight,models\XGBoost__class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,smote,models\XGBoost__smote_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,adasyn_class_weight,models\LightGBM__adasyn_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,smote,models\XGBoost__smote_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,class_weight,models\LightGBM__class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,class_weight,models\RandomForest__class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,class_weight,models\LightGBM__class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,smote,models\XGBoost__smote_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+XGBoost,class_weight,models\XGBoost__class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,adasyn_class_weight,models\LightGBM__adasyn_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,adasyn_class_weight,models\LightGBM__adasyn_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+LightGBM,class_weight,models\LightGBM__class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,smote,models\RandomForest__smote_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,smote_class_weight,models\RandomForest__smote_class_weight_rank2.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,smote,models\RandomForest__smote_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,smote_class_weight,models\RandomForest__smote_class_weight_rank3.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+AdaBoost,smote,models\AdaBoost__smote_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+AdaBoost,smote_class_weight,models\AdaBoost__smote_class_weight_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"
+RandomForest,smote,models\RandomForest__smote_rank1.joblib,error,,,,,,,,,,False,"The feature names should match those that were passed during fit.
+Feature names unseen at fit time:
+- Total_Calcium
+- Total_Energy
+- Total_FoodIntake
+- Total_Niacin
+- Total_Protein
+- ...
+Feature names seen at fit time, yet now missing:
+- Total_Calc
+- Total_Ener
+- Total_Food_epwt
+- Total_Nia
+- Total_Prot
+- ...
+"

@@ -1,0 +1,4 @@
+model_name,model_path,cal_accuracy,cal_precision,cal_recall,cal_f1,cal_auc,cal_logloss
+LogReg,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\LogReg.joblib,0.6226897924367358,0.44301038505919055,0.6013458637893027,0.5101754558653444,0.6607509156599154,0.65476566083715
+RandomForest,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\RandomForest.joblib,0.6721069092976969,0.4964140568969639,0.2409212205592296,0.32440243711920014,0.6669296868252006,0.5992821124697846
+XGBoost,c:\Jon\College\Thesis\V2.2.1.1\V2.2.1.1\clinical_dietary_multiyear_artifacts\models\XGBoost.joblib,0.6849208605819354,0.5465960665658094,0.20959508063580462,0.30300234820530025,0.6820140616412353,0.5848277877092157

@@ -1,0 +1,3 @@
+strategy,model,threshold,threshold_mode,test_accuracy,test_recall,test_f1,test_precision,test_auc,test_threshold,test_dual_min
+S40_adult_specialist,XGB_bal,0.43,recall_0.80_feasible,0.6705762764876065,0.8102264426588751,0.7247304802352172,0.6555555555555556,0.7244319148183139,0.43,0.6705762764876065
+S41_two_route_bio,CAT_route_present + CAT_route_missing,0.43,recall_0.80_feasible,0.6667448588630854,0.8058436815193571,0.7213286256048124,0.6528583264291632,0.7221569811053643,0.43,0.6667448588630854

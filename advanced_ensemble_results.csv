@@ -1,0 +1,2 @@
+best_model,threshold,test_accuracy,test_recall,test_f1,test_precision,test_auc,test_min_acc_rec_f1,meets_0_90_all,n_original_features,n_interaction_features_added,interaction_seed_cols,stack_top_members
+STACK_top4,0.53,0.6914460285132383,0.727002547410133,0.6932991429921047,0.6625822262350058,0.7639760952061299,0.6914460285132383,False,37,91,"['age', 'agemos', 'waist', 'BMI', 'hip', 'cu', 'finalwgt4', 'fwgt', 'sex', 'binge_drinking', 'Total_CHO', 'finalwgt1', 'Total_Energy', 'current_smoking']","['CAT_v1', 'CAT_v2', 'XGB_v1', 'XGB_v2']"

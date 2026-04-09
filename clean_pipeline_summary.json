@@ -1,0 +1,11 @@
+{
+  "best_model": "LGB_tuned_best",
+  "best_threshold": 0.53,
+  "best_dual_min": 0.6658671482589311,
+  "best_accuracy": 0.6658671482589311,
+  "best_recall": 0.6786703601108033,
+  "best_f1": 0.6454896559983234,
+  "best_precision": 0.615402180738711,
+  "best_specificity": 0.6554669121407385,
+  "meets_dual_target": false
+}

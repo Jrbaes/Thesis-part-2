@@ -1,0 +1,245 @@
+formno,variable_name,variable_label,var_value,value_label
+form11_2018,regcode,Name of Regions,1,Region I (Ilocos Region)
+form11_2018,regcode,Name of Regions,2,Region II (Cagayan Valley)
+form11_2018,regcode,Name of Regions,3,Region III (Central Luzon)
+form11_2018,regcode,Name of Regions,41,Region IV-A (CALABARZON)
+form11_2018,regcode,Name of Regions,42,Region IV-B (MIMAROPA)
+form11_2018,regcode,Name of Regions,5,Region V (Bicol Region)
+form11_2018,regcode,Name of Regions,6,Region VI (Western Visayas)
+form11_2018,regcode,Name of Regions,7,Region VII (Central Visayas)
+form11_2018,regcode,Name of Regions,8,Region VIII (Eastern Visayas)
+form11_2018,regcode,Name of Regions,9,Region IX (Zamboanga Peninsula)
+form11_2018,regcode,Name of Regions,10,Region X (Northern Mindanao)
+form11_2018,regcode,Name of Regions,11,Region XI (Davao Region)
+form11_2018,regcode,Name of Regions,12,Region XII (SOCCSKSARGEN)
+form11_2018,regcode,Name of Regions,13,National Capital Region (NCR)
+form11_2018,regcode,Name of Regions,14,Cordillera Administrative Region (CAR)
+form11_2018,regcode,Name of Regions,15,Autonomous Region In Muslim Mindanao (ARMM)
+form11_2018,regcode,Name of Regions,16,Region XIII (CARAGA)
+form11_2018,provhuc,Province and HUCs Level,1,Ilocos Norte
+form11_2018,provhuc,Province and HUCs Level,2,Ilocos Sur
+form11_2018,provhuc,Province and HUCs Level,3,La Union
+form11_2018,provhuc,Province and HUCs Level,4,Pangasinan
+form11_2018,provhuc,Province and HUCs Level,5,Batanes
+form11_2018,provhuc,Province and HUCs Level,6,Cagayan Province
+form11_2018,provhuc,Province and HUCs Level,7,Isabela Province
+form11_2018,provhuc,Province and HUCs Level,8,Nueva Vizcaya
+form11_2018,provhuc,Province and HUCs Level,9,Quirino
+form11_2018,provhuc,Province and HUCs Level,10,Bataan
+form11_2018,provhuc,Province and HUCs Level,11,Bulacan
+form11_2018,provhuc,Province and HUCs Level,12,Nueva Ecija
+form11_2018,provhuc,Province and HUCs Level,13,Angeles City
+form11_2018,provhuc,Province and HUCs Level,14,Pampanga
+form11_2018,provhuc,Province and HUCs Level,15,Tarlac
+form11_2018,provhuc,Province and HUCs Level,16,Zambales
+form11_2018,provhuc,Province and HUCs Level,17,Olongapo City
+form11_2018,provhuc,Province and HUCs Level,18,Aurora
+form11_2018,provhuc,Province and HUCs Level,19,Batangas
+form11_2018,provhuc,Province and HUCs Level,20,Cavite
+form11_2018,provhuc,Province and HUCs Level,21,Laguna
+form11_2018,provhuc,Province and HUCs Level,22,Quezon Province
+form11_2018,provhuc,Province and HUCs Level,23,Lucena City
+form11_2018,provhuc,Province and HUCs Level,24,Rizal
+form11_2018,provhuc,Province and HUCs Level,25,Marinduque
+form11_2018,provhuc,Province and HUCs Level,26,Occidental Mindoro
+form11_2018,provhuc,Province and HUCs Level,27,Oriental Mindoro
+form11_2018,provhuc,Province and HUCs Level,28,Palawan
+form11_2018,provhuc,Province and HUCs Level,29,Puerto Princesa City
+form11_2018,provhuc,Province and HUCs Level,30,Romblon
+form11_2018,provhuc,Province and HUCs Level,31,Albay
+form11_2018,provhuc,Province and HUCs Level,32,Camarines Norte
+form11_2018,provhuc,Province and HUCs Level,33,Camarines Sur
+form11_2018,provhuc,Province and HUCs Level,34,Catanduanes
+form11_2018,provhuc,Province and HUCs Level,35,Masbate
+form11_2018,provhuc,Province and HUCs Level,36,Sorsogon
+form11_2018,provhuc,Province and HUCs Level,37,Aklan
+form11_2018,provhuc,Province and HUCs Level,38,Antique
+form11_2018,provhuc,Province and HUCs Level,39,Capiz
+form11_2018,provhuc,Province and HUCs Level,40,Iloilo City
+form11_2018,provhuc,Province and HUCs Level,41,Iloilo Province
+form11_2018,provhuc,Province and HUCs Level,42,Bacolod City
+form11_2018,provhuc,Province and HUCs Level,43,Negros Occidental
+form11_2018,provhuc,Province and HUCs Level,44,Guimaras
+form11_2018,provhuc,Province and HUCs Level,45,Bohol
+form11_2018,provhuc,Province and HUCs Level,46,Mandaue City
+form11_2018,provhuc,Province and HUCs Level,47,Lapu-Lapu City (Opon)
+form11_2018,provhuc,Province and HUCs Level,48,Cebu
+form11_2018,provhuc,Province and HUCs Level,49,Cebu City
+form11_2018,provhuc,Province and HUCs Level,50,Negros Oriental
+form11_2018,provhuc,Province and HUCs Level,51,Siquijor
+form11_2018,provhuc,Province and HUCs Level,52,Eastern Samar
+form11_2018,provhuc,Province and HUCs Level,53,Tacloban City
+form11_2018,provhuc,Province and HUCs Level,54,Leyte
+form11_2018,provhuc,Province and HUCs Level,55,Northern Samar
+form11_2018,provhuc,Province and HUCs Level,56,Western Samar
+form11_2018,provhuc,Province and HUCs Level,57,Southern Leyte
+form11_2018,provhuc,Province and HUCs Level,58,Biliran
+form11_2018,provhuc,Province and HUCs Level,59,Zamboanga del Norte
+form11_2018,provhuc,Province and HUCs Level,60,Zamboanga City
+form11_2018,provhuc,Province and HUCs Level,61,Zamboanga Del Sur
+form11_2018,provhuc,Province and HUCs Level,62,Zamboanga Sibugay
+form11_2018,provhuc,Province and HUCs Level,63,City of Isabela
+form11_2018,provhuc,Province and HUCs Level,64,Bukidnon
+form11_2018,provhuc,Province and HUCs Level,65,Camiguin
+form11_2018,provhuc,Province and HUCs Level,66,Lanao Del Norte
+form11_2018,provhuc,Province and HUCs Level,67,Iligan City
+form11_2018,provhuc,Province and HUCs Level,68,Misamis Occidental
+form11_2018,provhuc,Province and HUCs Level,69,Cagayan De Oro
+form11_2018,provhuc,Province and HUCs Level,70,Misamis Oriental
+form11_2018,provhuc,Province and HUCs Level,71,Davao Del Norte
+form11_2018,provhuc,Province and HUCs Level,72,Davao City
+form11_2018,provhuc,Province and HUCs Level,73,Davao Del Sur
+form11_2018,provhuc,Province and HUCs Level,74,Davao Oriental
+form11_2018,provhuc,Province and HUCs Level,75,Compostela Valley
+form11_2018,provhuc,Province and HUCs Level,76,Davao Occidental
+form11_2018,provhuc,Province and HUCs Level,77,North Cotabato
+form11_2018,provhuc,Province and HUCs Level,78,South Cotabato
+form11_2018,provhuc,Province and HUCs Level,79,General Santos City
+form11_2018,provhuc,Province and HUCs Level,80,Sultan Kudarat
+form11_2018,provhuc,Province and HUCs Level,81,Sarangani
+form11_2018,provhuc,Province and HUCs Level,82,Cotabato City
+form11_2018,provhuc,Province and HUCs Level,83,City of Manila
+form11_2018,provhuc,Province and HUCs Level,84,Mandaluyong City
+form11_2018,provhuc,Province and HUCs Level,85,San Juan City
+form11_2018,provhuc,Province and HUCs Level,86,Quezon City
+form11_2018,provhuc,Province and HUCs Level,87,City Of Marikina
+form11_2018,provhuc,Province and HUCs Level,88,City of Pasig
+form11_2018,provhuc,Province and HUCs Level,89,Caloocan City
+form11_2018,provhuc,Province and HUCs Level,90,City Of Malabon
+form11_2018,provhuc,Province and HUCs Level,91,City of Navotas
+form11_2018,provhuc,Province and HUCs Level,92,City of Valenzuela
+form11_2018,provhuc,Province and HUCs Level,93,Makati City
+form11_2018,provhuc,Province and HUCs Level,94,Taguig City
+form11_2018,provhuc,Province and HUCs Level,95,Las Pi?as City
+form11_2018,provhuc,Province and HUCs Level,96,City Of Para?aque
+form11_2018,provhuc,Province and HUCs Level,97,Pateros
+form11_2018,provhuc,Province and HUCs Level,98,City of Muntinlupa
+form11_2018,provhuc,Province and HUCs Level,99,Pasay City
+form11_2018,provhuc,Province and HUCs Level,100,Abra
+form11_2018,provhuc,Province and HUCs Level,101,Baguio
+form11_2018,provhuc,Province and HUCs Level,102,Benguet
+form11_2018,provhuc,Province and HUCs Level,103,Ifugao
+form11_2018,provhuc,Province and HUCs Level,104,Kalinga
+form11_2018,provhuc,Province and HUCs Level,105,Mountain Province
+form11_2018,provhuc,Province and HUCs Level,106,Apayao
+form11_2018,provhuc,Province and HUCs Level,107,Basilan
+form11_2018,provhuc,Province and HUCs Level,108,Lanao Del Sur
+form11_2018,provhuc,Province and HUCs Level,109,Maguindanao
+form11_2018,provhuc,Province and HUCs Level,110,Tawi-Tawi
+form11_2018,provhuc,Province and HUCs Level,111,Butuan City
+form11_2018,provhuc,Province and HUCs Level,112,Agusan Del Norte
+form11_2018,provhuc,Province and HUCs Level,113,Agusan Del Sur
+form11_2018,provhuc,Province and HUCs Level,114,Surigao Del Norte
+form11_2018,provhuc,Province and HUCs Level,115,Surigao Del Sur
+form11_2018,provhuc,Province and HUCs Level,116,Dinagat Islands
+form11_2018,enns_year,Expanded National Nutrition Survey Year,,
+form11_2018,hhnum,Household Number (Merging variable/Unique household identifier),,
+form11_2018,member_code,Member Code (Merging variable/Unique identifier),,
+form11_2018,fwgti_natl_var,National Sampling Weights,,
+form11_2018,fwgti_prov,Provincial Sampling Weights,,
+form11_2018,rep_natl,ENNS Replicate Codes,,
+form11_2018,rep_prov,MS Replicate Codes,,
+form11_2018,ms_psucode,Primary Sampling Unit Number,,
+form11_2018,age,Age in Years,,
+form11_2018,sex,Sex,1,Male
+form11_2018,sex,Sex,2,Female
+form11_2018,csc,Civil Status Code,1,Single
+form11_2018,csc,Civil Status Code,2,Married
+form11_2018,csc,Civil Status Code,3,Widow/Widower
+form11_2018,csc,Civil Status Code,4,Separated/Annulled/Divorced
+form11_2018,csc,Civil Status Code,5,Common-Law/Live-in
+form11_2018,csc,Civil Status Code,6,Unknown
+form11_2018,psc,Physiological Status Code,0,Non-pregnant/Non-lactating female members
+form11_2018,psc,Physiological Status Code,1,Pregnant, 1 month   
+form11_2018,psc,Physiological Status Code,2,Pregnant, 2 months   
+form11_2018,psc,Physiological Status Code,3,Pregnant, 3 months   
+form11_2018,psc,Physiological Status Code,4,Pregnant, 4 months   
+form11_2018,psc,Physiological Status Code,5,Pregnant, 5 months   
+form11_2018,psc,Physiological Status Code,6,Pregnant, 6 months
+form11_2018,psc,Physiological Status Code,7,Pregnant, 7 months
+form11_2018,psc,Physiological Status Code,8,Pregnant, 8 months
+form11_2018,psc,Physiological Status Code,9,Pregnant, 9 months
+form11_2018,psc,Physiological Status Code,10,Lactating, 0- 6 months
+form11_2018,psc,Physiological Status Code,11,Lactating, 7-12 months
+form11_2018,psc,Physiological Status Code,12,Lactating, over 1 year
+form11_2018,psc,Physiological Status Code,99,Male Member
+form11_2018,rhc,Relationship to Household Head Code,1,Household Head
+form11_2018,rhc,Relationship to Household Head Code,2,Husband/Wife
+form11_2018,rhc,Relationship to Household Head Code,3,Son
+form11_2018,rhc,Relationship to Household Head Code,4,Daughter
+form11_2018,rhc,Relationship to Household Head Code,5,Stepson
+form11_2018,rhc,Relationship to Household Head Code,6,Stepdaughter
+form11_2018,rhc,Relationship to Household Head Code,7,Son in law
+form11_2018,rhc,Relationship to Household Head Code,8,Daughter in law
+form11_2018,rhc,Relationship to Household Head Code,9,Grandson
+form11_2018,rhc,Relationship to Household Head Code,10,Granddaughter
+form11_2018,rhc,Relationship to Household Head Code,11,Father
+form11_2018,rhc,Relationship to Household Head Code,12,Mother
+form11_2018,rhc,Relationship to Household Head Code,13,Brother
+form11_2018,rhc,Relationship to Household Head Code,14,Sister
+form11_2018,rhc,Relationship to Household Head Code,15,Uncle
+form11_2018,rhc,Relationship to Household Head Code,16,Aunt
+form11_2018,rhc,Relationship to Household Head Code,17,Nephew
+form11_2018,rhc,Relationship to Household Head Code,18,Niece
+form11_2018,rhc,Relationship to Household Head Code,19,Other Relative
+form11_2018,rhc,Relationship to Household Head Code,20,Non relative
+form11_2018,rhc,Relationship to Household Head Code,21,Boarder
+form11_2018,rhc,Relationship to Household Head Code,22,Domestic Helper
+form11_2018,educ,Highest Educational Attainment,0,No Grade Completed
+form11_2018,educ,Highest Educational Attainment,1,ECCD/Nursery
+form11_2018,educ,Highest Educational Attainment,2,Kinder
+form11_2018,educ,Highest Educational Attainment,3,Preparatory
+form11_2018,educ,Highest Educational Attainment,11,Grade I
+form11_2018,educ,Highest Educational Attainment,12,Grade II
+form11_2018,educ,Highest Educational Attainment,13,Grade III
+form11_2018,educ,Highest Educational Attainment,14,Grade IV
+form11_2018,educ,Highest Educational Attainment,15,Grade V
+form11_2018,educ,Highest Educational Attainment,16,Grade VI (if w/ VII)
+form11_2018,educ,Highest Educational Attainment,17,Elementary Graduate
+form11_2018,educ,Highest Educational Attainment,21,1st Year HS/Grade 7
+form11_2018,educ,Highest Educational Attainment,22,2nd Year HS/Grade 8
+form11_2018,educ,Highest Educational Attainment,23,3rd Year HS/Grade 9
+form11_2018,educ,Highest Educational Attainment,24,4th Year HS/Grade 10
+form11_2018,educ,Highest Educational Attainment,25,Grade 11
+form11_2018,educ,Highest Educational Attainment,26,Grade 12
+form11_2018,educ,Highest Educational Attainment,27,High School Graduate
+form11_2018,educ,Highest Educational Attainment,41,1st Year Vocational
+form11_2018,educ,Highest Educational Attainment,42,2nd Year/3rd Year Vocational
+form11_2018,educ,Highest Educational Attainment,43,Technical Vocational Graduate/Vocational Graduate
+form11_2018,educ,Highest Educational Attainment,51,1st Year College
+form11_2018,educ,Highest Educational Attainment,52,2nd Year College
+form11_2018,educ,Highest Educational Attainment,53,3rd Year College
+form11_2018,educ,Highest Educational Attainment,54,4th/5th Year College
+form11_2018,educ,Highest Educational Attainment,55,College Graduate
+form11_2018,educ,Highest Educational Attainment,66,Master's Graduate
+form11_2018,educ,Highest Educational Attainment,67,PhD Graduate
+form11_2018,educ,Highest Educational Attainment,77,Alternative Learning System (ALS)
+form11_2018,educ,Highest Educational Attainment,81,SPED
+form11_2018,educ,Highest Educational Attainment,82,Arabic Schooling
+form11_2018,educ,Highest Educational Attainment,83,Others
+form11_2018,educ,Highest Educational Attainment,99,Not Applicable (less than 3 yrs. old)
+form11_2018,educ,Highest Educational Attainment,9999,Missing
+form11_2018,haswork,Work Code,0,No occupation
+form11_2018,haswork,Work Code,1,House keeper
+form11_2018,haswork,Work Code,2,Student
+form11_2018,haswork,Work Code,3,Pensioner
+form11_2018,haswork,Work Code,11,With job or business
+form11_2018,haswork,Work Code,99,Not Applicable (less than 10 yrs. old)
+form11_2018,occup,Current Occupation (PSOC),0,Armed forces occupations
+form11_2018,occup,Current Occupation (PSOC),1,Managers
+form11_2018,occup,Current Occupation (PSOC),2,Professionals
+form11_2018,occup,Current Occupation (PSOC),3,Technicians and associate professionals
+form11_2018,occup,Current Occupation (PSOC),4,Clerical support workers
+form11_2018,occup,Current Occupation (PSOC),5,Service and sales workers
+form11_2018,occup,Current Occupation (PSOC),6,Skilled agricultural, forestry, and fishery workers
+form11_2018,occup,Current Occupation (PSOC),7,Craft and related trades workers
+form11_2018,occup,Current Occupation (PSOC),8,Plant and machine operators and assemblers
+form11_2018,occup,Current Occupation (PSOC),9,Elementary occupations
+form11_2018,occup,Current Occupation (PSOC),88,Other occupation not stated/elsewhere classified
+form11_2018,occup,Current Occupation (PSOC),89,No Occupation/Pensioner/Full-time Student
+form11_2018,occup,Current Occupation (PSOC),99,Not Applicable (less than 10 yrs. old)
+form11_2018,wrkplace,Place of Work,0,At Home
+form11_2018,wrkplace,Place of Work,1,Local, away from home
+form11_2018,wrkplace,Place of Work,2,Abroad
+form11_2018,wrkplace,Place of Work,9,No Occupation/Pensioner/Full-time Student
+form11_2018,wrkplace,Place of Work,99,Not Applicable (less than 10 yrs. old)
