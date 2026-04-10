@@ -1,101 +1,101 @@
 case_number,model,feature_rule,weight
-1,lightgbm,-0.88 < num__age <= -0.23,-0.18356864446160612
-1,lightgbm,-1.03 < num__sex <= 0.97,-0.08334957306032847
-1,lightgbm,-0.23 < num__fg9 <= 0.28,-0.013850351114473405
-1,lightgbm,-0.46 < num__Total_Iron <= -0.15,-0.013254908494247547
-1,lightgbm,-0.59 < num__fg15 <= -0.15,-0.01058823190185171
-1,lightgbm,num__fg10 <= -0.51,0.01052063451198208
-1,lightgbm,num__fg23 <= -0.44,-0.00875308863066691
-1,lightgbm,num__smoke_alcohol_risk <= -0.88,0.008669770001408906
-1,lightgbm,num__fg27 <= -0.17,-0.008299468932885551
-1,lightgbm,num__csc <= -0.70,-0.0079051739533319
-1,lightgbm,num__Total_Riboflavin <= -0.51,-0.007386835474963628
-1,lightgbm,-0.49 < num__fg24 <= -0.24,0.007237805560510246
-1,lightgbm,num__fg16 <= -0.67,0.0068951133358032685
-1,lightgbm,num__Total_CHO > 0.47,-0.006872398750311748
-1,lightgbm,num__fg5 <= -0.32,0.006460393630382951
-1,lightgbm,num__fg7 <= -0.59,-0.005613745230680583
-1,lightgbm,num__fg11 <= -0.35,-0.0054844163706523645
-1,lightgbm,-0.63 < num__cu <= -0.05,-0.0053561605521792125
-1,lightgbm,num__fg6 > 0.27,0.005345030891420174
-1,lightgbm,num__fg21 <= -0.16,-0.004989699919314012
-2,lightgbm,-0.23 < num__age <= 0.79,0.1937852560860746
-2,lightgbm,-1.03 < num__sex <= 0.97,-0.07775744151522512
-2,lightgbm,-0.88 < num__smoke_alcohol_risk <= -0.47,-0.02000586909906731
-2,lightgbm,num__fg7 <= -0.59,-0.01582137797039699
-2,lightgbm,-0.15 < num__Total_Iron <= 0.24,0.012018128539902806
-2,lightgbm,-0.37 < num__fg17 <= 0.25,-0.012008106403243596
-2,lightgbm,num__fg16 > 0.34,0.011916968586003369
-2,lightgbm,num__Total_Fat > 0.39,0.011161683479846248
-2,lightgbm,-0.24 < num__fg24 <= 0.17,-0.010796494259556887
-2,lightgbm,-0.57 < num__fg9 <= -0.23,-0.009922362983109844
-2,lightgbm,-0.32 < num__fg5 <= -0.06,-0.008097574423455713
-2,lightgbm,-0.19 < num__Total_VitaminC <= 0.31,-0.00791688818692124
-2,lightgbm,num__fg12 <= -0.27,-0.007333408278925384
-2,lightgbm,-0.15 < num__Total_Riboflavin <= 0.30,-0.006471093450344351
-2,lightgbm,-0.21 < num__fg4 <= 0.32,-0.004980178381457432
-2,lightgbm,-0.20 < num__fg23 <= 0.15,0.004167562652632041
-2,lightgbm,num__fg3 <= -0.41,-0.003944655187586756
-2,lightgbm,num__fg19 > 0.16,0.003748829375169037
-2,lightgbm,-0.70 < num__csc <= 0.25,-0.003563437663636084
-2,lightgbm,num__fg6 > 0.27,0.002951584263576219
-3,lightgbm,num__age <= -0.88,-0.3955483522936523
-3,lightgbm,-1.03 < num__sex <= 0.97,-0.06673902382279072
-3,lightgbm,num__Total_VitaminC <= -0.56,-0.0147306677281969
-3,lightgbm,num__fg26 <= -0.57,0.01177869536241886
-3,lightgbm,num__fg27 > -0.05,0.010846954093248288
-3,lightgbm,-0.37 < num__fg17 <= 0.25,-0.010433232815198352
-3,lightgbm,num__fg6 > 0.27,-0.010270602288171327
-3,lightgbm,-0.20 < num__fg23 <= 0.15,-0.006559547095631175
-3,lightgbm,-0.21 < num__fg4 <= 0.32,-0.005347295529542532
-3,lightgbm,num__csc <= -0.70,0.0053429655286296755
-3,lightgbm,num__fg12 <= -0.27,-0.00427397353661473
-3,lightgbm,-0.59 < num__fg15 <= -0.15,-0.004182190239516595
-3,lightgbm,-0.15 < num__Total_Iron <= 0.24,-0.0037689214352972654
-3,lightgbm,num__smoke_alcohol_risk <= -0.88,0.003011939291780216
-3,lightgbm,-0.09 < num__Total_CHO <= 0.47,-0.002733203748956399
-3,lightgbm,-0.51 < num__Total_Riboflavin <= -0.15,0.0024073505924322156
-3,lightgbm,num__fg3 <= -0.41,0.0020908299480613905
-3,lightgbm,-0.26 < num__fg19 <= 0.16,0.0016973714526919848
-3,lightgbm,num__fg24 <= -0.49,-0.0015510647686217763
-3,lightgbm,num__fg21 <= -0.16,0.001499899939989814
-4,lightgbm,-0.88 < num__age <= -0.23,-0.19148837810909605
-4,lightgbm,num__sex <= -1.03,0.0738243793146147
-4,lightgbm,num__cu <= -0.63,0.01452694239512329
-4,lightgbm,-0.19 < num__Total_VitaminC <= 0.31,-0.013515317517892743
-4,lightgbm,num__fg21 <= -0.16,-0.011187380859929584
-4,lightgbm,num__fg17 > 0.25,0.01081447499259245
-4,lightgbm,-0.49 < num__fg24 <= -0.24,0.010184209980226675
-4,lightgbm,num__Total_Fat <= -0.61,-0.009962590216829544
-4,lightgbm,num__csc <= -0.70,0.008731832188494711
-4,lightgbm,num__fg19 <= -0.52,-0.008614378051559696
-4,lightgbm,num__fg18 <= -0.72,-0.007538750867448802
-4,lightgbm,-0.21 < num__fg4 <= 0.32,-0.005735777611473628
-4,lightgbm,num__Total_Iron > 0.24,-0.004553012593444646
-4,lightgbm,num__Total_CHO <= -0.61,0.004534544653613028
-4,lightgbm,num__smoke_alcohol_risk <= -0.88,-0.004441867281919931
-4,lightgbm,num__fg3 <= -0.41,-0.004129207451428939
-4,lightgbm,num__fg23 <= -0.44,-0.004070573996211337
-4,lightgbm,-0.15 < num__Total_Riboflavin <= 0.30,0.004059521223789237
-4,lightgbm,-0.51 < num__fg10 <= -0.16,-0.0037534932706966254
-4,lightgbm,num__fg27 <= -0.17,0.002917694293476422
-5,lightgbm,-0.88 < num__age <= -0.23,-0.19391602971894684
-5,lightgbm,-1.03 < num__sex <= 0.97,-0.0630046168936982
-5,lightgbm,num__fg21 <= -0.16,-0.01824305812279847
-5,lightgbm,num__Total_CHO > 0.47,-0.01323956042075516
-5,lightgbm,num__fg17 <= -0.58,0.01281359721158837
-5,lightgbm,num__fg5 > -0.06,0.010921573767451218
-5,lightgbm,-0.15 < num__Total_Iron <= 0.24,-0.009758152677883675
-5,lightgbm,num__fg23 > 0.15,0.009600352124470113
-5,lightgbm,num__csc <= -0.70,0.00861806487949913
-5,lightgbm,-0.24 < num__fg24 <= 0.17,-0.008472765114956397
-5,lightgbm,-0.88 < num__smoke_alcohol_risk <= -0.47,-0.008151415004740342
-5,lightgbm,-0.67 < num__fg16 <= -0.23,-0.007877584515404039
-5,lightgbm,-0.15 < num__Total_Riboflavin <= 0.30,-0.007302749511616163
-5,lightgbm,num__fg27 > -0.05,0.006538690628890121
-5,lightgbm,-0.56 < num__Total_VitaminC <= -0.19,-0.005960516126908881
-5,lightgbm,num__fg3 <= -0.41,0.004526527813477529
-5,lightgbm,num__fg4 > 0.32,0.004519838061729508
-5,lightgbm,-0.57 < num__fg26 <= -0.20,-0.004323662951117443
-5,lightgbm,-0.61 < num__Total_Fat <= -0.15,-0.004147791146782569
-5,lightgbm,num__fg19 > 0.16,0.002830218126429262
+1,random_forest,-0.88 < num__age <= -0.23,-0.21374087038781867
+1,random_forest,num__fg4 <= -0.60,0.01492002551009493
+1,random_forest,-0.22 < num__fg9 <= 0.28,-0.014569386059647483
+1,random_forest,num__fg6 > 0.27,0.012305989716686871
+1,random_forest,-0.47 < num__Total_Iron <= -0.15,-0.011064209153819613
+1,random_forest,num__fg17 <= -0.57,-0.01069641392523515
+1,random_forest,-0.63 < num__cu <= -0.07,-0.010504305946729886
+1,random_forest,num__fg5 <= -0.33,-0.01043376587570359
+1,random_forest,num__fg21 <= -0.16,-0.00804302000653411
+1,random_forest,num__fg23 <= -0.44,-0.006379076078638233
+1,random_forest,-0.56 < num__Total_VitaminC <= -0.19,0.0062830225042479985
+1,random_forest,num__fg11 <= -0.36,-0.0060390386224573635
+1,random_forest,num__fg19 <= -0.52,-0.005965787505987274
+1,random_forest,num__Total_Fat <= -0.60,0.005725346291849095
+1,random_forest,-0.49 < num__fg24 <= -0.24,-0.005128292946373755
+1,random_forest,num__fe_smoking_level <= -0.65,-0.004903542481371736
+1,random_forest,num__fe_alcohol_level <= -0.96,-0.004326135108547827
+1,random_forest,num__fg16 <= -0.66,0.0032834475895145896
+1,random_forest,num__fg10 <= -0.50,-0.002872282491282893
+1,random_forest,num__Total_Riboflavin <= -0.51,0.0028064844648031896
+2,random_forest,-0.23 < num__age <= 0.79,0.14155793889069906
+2,random_forest,-0.32 < num__fg5 <= -0.06,0.013668658721206517
+2,random_forest,-0.47 < num__Total_Iron <= -0.15,-0.012056441291582225
+2,random_forest,-0.17 < num__fg27 <= -0.05,0.011627978376479498
+2,random_forest,-0.29 < num__fg7 <= 0.22,0.011061625557230656
+2,random_forest,-0.38 < num__fg17 <= 0.24,0.009227567731124731
+2,random_forest,-0.66 < num__fg16 <= -0.23,0.00817078798253923
+2,random_forest,num__fg4 <= -0.60,0.008095316809540152
+2,random_forest,-1.03 < num__sex <= 0.97,-0.007407152930775315
+2,random_forest,-0.18 < num__fg6 <= 0.27,0.007150268451985545
+2,random_forest,-0.56 < num__Total_VitaminC <= -0.19,0.007129820073148802
+2,random_forest,num__fg12 <= -0.27,0.006090164777026889
+2,random_forest,num__Total_Riboflavin <= -0.51,0.00563361074939505
+2,random_forest,num__fg18 <= -0.72,-0.005243155851730343
+2,random_forest,-0.21 < num__fg26 <= 0.31,0.005239491538807148
+2,random_forest,-0.58 < num__fg15 <= -0.15,-0.005226197695717061
+2,random_forest,-0.23 < num__fg11 <= 0.08,0.005133475142495179
+2,random_forest,-0.65 < num__fe_smoking_level <= 0.40,-0.005076656216849481
+2,random_forest,-0.49 < num__fg24 <= -0.24,0.0037929348958478455
+2,random_forest,-0.96 < num__fe_alcohol_level <= -0.47,-0.003612370882494419
+3,random_forest,num__age <= -0.88,-0.35622232611400073
+3,random_forest,num__fe_smoking_level <= -0.65,0.012774302834768813
+3,random_forest,num__fg3 <= -0.41,0.010941868556700698
+3,random_forest,-0.66 < num__fg16 <= -0.23,-0.010142040522962692
+3,random_forest,-0.50 < num__fg10 <= -0.16,-0.009989561004165948
+3,random_forest,-0.56 < num__Total_VitaminC <= -0.19,0.009329729819151289
+3,random_forest,num__fg12 > -0.16,0.008881463829010339
+3,random_forest,-0.26 < num__fg19 <= 0.15,0.007761740755479512
+3,random_forest,num__fg27 > -0.05,-0.007062881728321804
+3,random_forest,-0.32 < num__fg5 <= -0.06,0.0069645726336482385
+3,random_forest,-0.09 < num__Total_CHO <= 0.47,-0.0057919180830891944
+3,random_forest,-0.29 < num__fg7 <= 0.22,0.004781174172985731
+3,random_forest,num__fg24 <= -0.49,0.004507522745785079
+3,random_forest,-0.22 < num__fg9 <= 0.28,0.004143655551871168
+3,random_forest,-0.51 < num__Total_Riboflavin <= -0.16,0.003494477051103681
+3,random_forest,-0.36 < num__fg11 <= -0.23,-0.003363484790492101
+3,random_forest,num__fe_alcohol_level <= -0.96,-0.0031053407712497735
+3,random_forest,num__fg21 <= -0.16,-0.002750739357959838
+3,random_forest,-0.38 < num__fg17 <= 0.24,0.0026309216660316075
+3,random_forest,-0.18 < num__fg18 <= 0.47,-0.002519548046778826
+4,random_forest,-0.88 < num__age <= -0.23,-0.23035376829091014
+4,random_forest,num__fe_alcohol_level <= -0.96,-0.015749536476115614
+4,random_forest,num__fg26 <= -0.57,0.01524113814927284
+4,random_forest,num__fg27 <= -0.17,-0.011990675905065851
+4,random_forest,num__Total_Iron > 0.24,0.009509998012757676
+4,random_forest,-0.58 < num__fg7 <= -0.29,0.008598516365538777
+4,random_forest,num__cu <= -0.63,0.008305305183672887
+4,random_forest,num__fg5 <= -0.33,0.008080902594796952
+4,random_forest,num__fg6 <= -0.52,0.007244464416819452
+4,random_forest,num__fg19 <= -0.52,0.006645374396457254
+4,random_forest,-0.15 < num__fg15 <= 0.37,0.0058204112801233995
+4,random_forest,num__fe_smoking_level <= -0.65,0.005010753125139187
+4,random_forest,num__fg23 <= -0.44,0.004433570429170134
+4,random_forest,num__fg3 <= -0.41,-0.0043110154536279074
+4,random_forest,-0.19 < num__Total_VitaminC <= 0.30,-0.004080867382440127
+4,random_forest,-0.50 < num__fg10 <= -0.16,-0.0036027058782364283
+4,random_forest,num__Total_CHO <= -0.60,-0.0030796949737838613
+4,random_forest,-0.49 < num__fg24 <= -0.24,0.0028930482274308117
+4,random_forest,-0.16 < num__Total_Riboflavin <= 0.29,0.002877049600368369
+4,random_forest,num__fg12 <= -0.27,-0.0026376333254976027
+5,random_forest,-0.88 < num__age <= -0.23,-0.2241017094958285
+5,random_forest,-0.57 < num__fg26 <= -0.21,0.01477884349275719
+5,random_forest,num__fg7 > 0.22,-0.013770949929229613
+5,random_forest,-0.07 < num__cu <= 0.49,-0.010168643745593288
+5,random_forest,-0.16 < num__Total_Riboflavin <= 0.29,-0.00970387550078303
+5,random_forest,num__fg27 > -0.05,-0.009100489120037527
+5,random_forest,num__fg19 > 0.15,-0.007459291542390244
+5,random_forest,num__fg17 <= -0.57,0.007210937659543358
+5,random_forest,num__fg21 <= -0.16,-0.007130133774378662
+5,random_forest,num__fe_smoking_level <= -0.65,0.0061603306275823866
+5,random_forest,-0.66 < num__fg16 <= -0.23,0.0057330357095040215
+5,random_forest,num__fg23 > 0.14,0.005396395181706837
+5,random_forest,num__fg5 > -0.06,0.005278405387612375
+5,random_forest,-0.15 < num__fg15 <= 0.37,0.005173318213841633
+5,random_forest,-0.16 < num__fg10 <= 0.25,-0.004756803296599846
+5,random_forest,num__fg12 <= -0.27,0.004621625200388507
+5,random_forest,num__fg3 <= -0.41,0.0045140125042447896
+5,random_forest,-0.24 < num__fg24 <= 0.17,0.00445311206560104
+5,random_forest,-0.60 < num__Total_Fat <= -0.15,-0.004374965880821276
+5,random_forest,num__fg9 <= -0.57,0.004092191829021437

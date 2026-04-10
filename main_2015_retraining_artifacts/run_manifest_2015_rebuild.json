@@ -17,29 +17,29 @@
     "adaboost",
     "lightgbm"
   ],
-  "stage1_trials_per_model": 80,
-  "stage2_refinements_per_top_config": 18,
-  "top_k_stage1": 8,
-  "top_k_stage2": 3,
+  "stage1_trials_per_model": 140,
+  "stage2_refinements_per_top_config": 28,
+  "top_k_stage1": 10,
+  "top_k_stage2": 4,
   "epochs": {
-    "stage1": 25,
-    "stage2": 80,
-    "final": 300
+    "stage1": 40,
+    "stage2": 120,
+    "final": 500
   },
   "cv_folds": {
     "stage1": 5,
-    "stage2": 5,
-    "stack_oof": 5
+    "stage2": 6,
+    "stack_oof": 6
   },
   "stack_search": {
-    "meta_trials": 200,
-    "blend_trials": 3000,
-    "top_base_models": 6
+    "meta_trials": 400,
+    "blend_trials": 7000,
+    "top_base_models": 7
   },
   "best_stack_strategy": "weighted_blend",
   "best_stack_calibration": "base",
   "collinearity_cutoff": 0.7,
   "final_feature_count": 29,
-  "best_model": "lightgbm",
+  "best_model": "random_forest",
   "best_calibration": "base"
 }

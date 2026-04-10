@@ -1,13 +1,13 @@
 {
-  "best_model": "lightgbm",
+  "best_model": "random_forest",
   "calibration_method": "base",
-  "selection_cal_logloss": 0.46362791246947105,
-  "selection_cal_ece": 0.011309675054077779,
-  "test_accuracy": 0.750606287755192,
-  "test_precision": 0.6126115815976196,
-  "test_recall": 0.702124868835257,
-  "test_f1": 0.654320987654321,
-  "test_auc": 0.8184135129917132,
-  "test_logloss": 0.47567434379059936,
-  "test_ece": 0.00770833351268341
+  "selection_cal_logloss": 0.4637760539939696,
+  "selection_cal_ece": 0.011806671016118753,
+  "test_accuracy": 0.7497244146567309,
+  "test_precision": 0.6087296271489172,
+  "test_recall": 0.7152413431269675,
+  "test_f1": 0.657701121698227,
+  "test_auc": 0.8178585567504668,
+  "test_logloss": 0.47652185611066683,
+  "test_ece": 0.007080364855936885
 }

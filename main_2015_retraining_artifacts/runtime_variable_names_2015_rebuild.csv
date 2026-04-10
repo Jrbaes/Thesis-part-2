@@ -89,6 +89,7 @@ accuracy_score
 alcohol_feature
 alcohol_sources
 all_cols
+anthro_cols
 apply_calibration
 audit_rows
 base_cols
@@ -362,6 +363,7 @@ warnings
 weight
 weights
 x_lc
+x_train_cols
 xgb_available
 y
 y_eval
