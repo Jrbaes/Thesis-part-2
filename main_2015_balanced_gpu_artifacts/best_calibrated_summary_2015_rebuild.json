@@ -1,0 +1,13 @@
+{
+  "best_model": "catboost",
+  "calibration_method": "base",
+  "selection_cal_logloss": 0.4363967027845032,
+  "selection_cal_ece": 0.01122920400244415,
+  "test_accuracy": 0.7705807134353366,
+  "test_precision": 0.6527830367285119,
+  "test_recall": 0.6783840503672612,
+  "test_f1": 0.6653373641216955,
+  "test_auc": 0.8455559895284273,
+  "test_logloss": 0.4506672800075927,
+  "test_ece": 0.009143928199546788
+}

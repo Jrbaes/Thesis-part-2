@@ -1,0 +1,101 @@
+case_number,model,feature_rule,weight
+1,catboost,-0.88 < num__age <= -0.23,-0.13769897473783824
+1,catboost,-0.82 < num__bmi <= -0.08,-0.0836799226546451
+1,catboost,num__psc_anthro <= -0.97,-0.05393786337295047
+1,catboost,-0.64 < num__regcode_anthro <= -0.31,-0.02683800502587275
+1,catboost,num__fe_alcohol_level <= -0.91,-0.018014844020889476
+1,catboost,num__fg16 <= -0.72,-0.014964158420315753
+1,catboost,-0.64 < num__whr <= -0.09,-0.011379563253808034
+1,catboost,num__Total_CHO > 0.46,-0.010526908361808744
+1,catboost,-0.50 < num__fg24 <= -0.26,0.010475281331529196
+1,catboost,num__mos_preg <= -0.69,-0.01007225207126908
+1,catboost,num__fg11 <= -0.35,0.009340481226897365
+1,catboost,num__fg17 <= -0.57,-0.009242866316598711
+1,catboost,num__fg27 <= -0.17,-0.008326806682751185
+1,catboost,num__Total_Riboflavin <= -0.52,0.007251720226425872
+1,catboost,num__fg3 <= -0.37,0.006801991728171241
+1,catboost,num__Total_Fat <= -0.64,0.006441722949517446
+1,catboost,-0.46 < num__fg23 <= -0.21,-0.006184248745193411
+1,catboost,-0.47 < num__Total_Iron <= -0.16,-0.005896802988009603
+1,catboost,-0.24 < num__fg9 <= 0.26,-0.005551402745260694
+1,catboost,-0.20 < num__fg26 <= 0.32,-0.00553280555006795
+2,catboost,-0.23 < num__age <= 0.79,0.10142225726446903
+2,catboost,num__psc_anthro <= -0.97,-0.06181786049323339
+2,catboost,num__regcode_anthro > 0.12,0.031542345419131194
+2,catboost,-0.18 < num__fg10 <= 0.23,-0.02037965567550107
+2,catboost,-0.11 < num__Total_CHO <= 0.46,0.01857695120476977
+2,catboost,num__fg3 <= -0.37,0.018206952391733446
+2,catboost,num__ethnicity <= -0.26,-0.016881808417152783
+2,catboost,-0.08 < num__bmi <= 0.64,0.016672429778916656
+2,catboost,num__fg12 <= -0.26,0.014411205118334778
+2,catboost,num__fg16 > 0.37,0.013550404850233932
+2,catboost,-0.09 < num__whr <= 0.54,-0.013086530903308963
+2,catboost,num__fg9 > 0.26,-0.011270274407833755
+2,catboost,num__fe_smoking_level <= -0.64,-0.011129379817616535
+2,catboost,num__fg18 > 0.47,-0.011082999981182493
+2,catboost,num__mos_lactation > 0.94,0.010182011374063916
+2,catboost,-0.44 < num__fe_alcohol_level <= 0.75,-0.009812068531960838
+2,catboost,num__mos_preg <= -0.69,-0.009762999052554436
+2,catboost,-0.26 < num__fg24 <= 0.17,-0.009445026402061161
+2,catboost,num__cu > 0.51,-0.009233395233913156
+2,catboost,-0.26 < num__fg19 <= 0.16,-0.00920072555999159
+3,catboost,num__age <= -0.88,-0.3139049574434107
+3,catboost,-0.82 < num__bmi <= -0.08,-0.07977236981933641
+3,catboost,num__psc_anthro <= -0.97,-0.05450014962765251
+3,catboost,num__fg3 > -0.24,-0.027070531184938743
+3,catboost,-0.64 < num__whr <= -0.09,-0.022352318159149585
+3,catboost,num__ethnicity <= -0.26,-0.01764354878189521
+3,catboost,-0.72 < num__fg16 <= -0.26,-0.015434712650831673
+3,catboost,num__fe_smoking_level <= -0.64,-0.014614039820615082
+3,catboost,-0.10 < num__cu <= 0.51,-0.011266144887568183
+3,catboost,-0.50 < num__fg10 <= -0.18,0.010097618702500023
+3,catboost,-0.84 < num__provcode_anthro <= -0.13,-0.009549481163059852
+3,catboost,num__fg15 <= -0.61,0.008377781511873121
+3,catboost,num__fg21 <= -0.16,-0.007601216785870624
+3,catboost,num__anthro_group <= -0.42,-0.0075258682932691475
+3,catboost,-0.24 < num__fg9 <= 0.26,-0.0072582637735106904
+3,catboost,-0.60 < num__Total_Calcium <= -0.13,-0.0067026512612153345
+3,catboost,-0.21 < num__fg23 <= 0.16,0.006380278203805687
+3,catboost,-0.57 < num__fg17 <= -0.40,-0.005852477938734008
+3,catboost,num__mos_preg <= -0.69,-0.005421719787555495
+3,catboost,-0.23 < num__fg11 <= 0.08,0.00533334366100318
+4,catboost,-0.88 < num__age <= -0.23,-0.14118967544508473
+4,catboost,-0.93 < num__psc_anthro <= 1.03,0.06998767278484597
+4,catboost,num__psurec_anthro > -0.05,0.026247303018210925
+4,catboost,-0.78 < num__mos_lactation <= 0.08,-0.02254716870997702
+4,catboost,-0.08 < num__bmi <= 0.64,0.01745376572925814
+4,catboost,-0.31 < num__regcode_anthro <= 0.12,-0.015648546007723085
+4,catboost,-0.02 < num__mos_preg <= 0.83,-0.013788346721650373
+4,catboost,num__fg3 <= -0.37,0.013245044854754768
+4,catboost,num__fg11 > 0.08,-0.01268463615048545
+4,catboost,num__cu <= -0.63,0.01263916285638388
+4,catboost,num__fg5 <= -0.31,-0.012585451396516917
+4,catboost,num__fg9 > 0.26,0.01010362752551023
+4,catboost,num__fg18 <= -0.74,-0.010075475495409549
+4,catboost,num__fg27 <= -0.17,0.00899700067973927
+4,catboost,num__fg23 <= -0.46,-0.0078037432071514515
+4,catboost,num__fg19 <= -0.52,-0.0075689409240263066
+4,catboost,-0.15 < num__fg15 <= 0.39,-0.007218474569922018
+4,catboost,-0.09 < num__whr <= 0.54,-0.007173962684769733
+4,catboost,num__anthro_group <= -0.42,-0.006444026931668284
+4,catboost,num__fg21 <= -0.16,-0.00613664084487549
+5,catboost,num__bmi <= -0.82,-0.14615285335919612
+5,catboost,-0.88 < num__age <= -0.23,-0.14266049003775588
+5,catboost,num__psc_anthro <= -0.97,-0.06497104989103901
+5,catboost,num__whr <= -0.64,-0.024971996756145098
+5,catboost,-0.57 < num__fg17 <= -0.40,-0.01708581315199539
+5,catboost,num__fg26 > 0.32,-0.01620860180607495
+5,catboost,num__fg3 > -0.24,-0.015566399148047621
+5,catboost,-0.78 < num__mos_lactation <= 0.08,0.011552540721146878
+5,catboost,num__regcode_anthro > 0.12,0.010399791121868868
+5,catboost,-0.29 < num__fg7 <= 0.21,-0.008751044996001604
+5,catboost,num__fe_alcohol_level <= -0.91,-0.00824312116315471
+5,catboost,-0.61 < num__fg15 <= -0.15,-0.0080764247383677
+5,catboost,num__fe_smoking_level <= -0.64,-0.007297187711391912
+5,catboost,num__fg21 <= -0.16,0.007182053328501217
+5,catboost,-0.69 < num__mos_preg <= -0.02,-0.006816758444847462
+5,catboost,num__fg12 <= -0.26,0.006021865276836807
+5,catboost,num__fg27 <= -0.17,-0.005750367480710253
+5,catboost,-0.18 < num__Total_Fat <= 0.42,0.005713404828998282
+5,catboost,-0.24 < num__fg9 <= 0.26,-0.005514890262477242
+5,catboost,-0.11 < num__Total_CHO <= 0.46,-0.0054088875268585
