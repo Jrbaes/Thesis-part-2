@@ -1,0 +1,147 @@
+formno,variable_name,variable_label,var_value,value_label
+form5_2015,Total_Energy,Total Energy (Kcal),,
+form5_2015,fg6,Sugar and Syrups (in grams),,
+form5_2015,fg7,Dried Beans, Nuts and Seeds (in grams),,
+form5_2015,fg8,Vegetables (in grams),,
+form5_2015,fg9,Green Leafy and Yellow (in grams),,
+form5_2015,hhnum,Household Number 
+(Unique identifier; merging variable)
+,,
+form5_2015,provcode,Name of Provinces,1,ABRA
+form5_2015,provcode,Name of Provinces,2,AGUSAN DEL NORTE
+form5_2015,provcode,Name of Provinces,3,AGUSAN DEL SUR
+form5_2015,provcode,Name of Provinces,4,AKLAN
+form5_2015,provcode,Name of Provinces,5,ALBAY
+form5_2015,provcode,Name of Provinces,6,ANTIQUE
+form5_2015,provcode,Name of Provinces,7,BASILAN
+form5_2015,provcode,Name of Provinces,8,BATAAN
+form5_2015,provcode,Name of Provinces,10,BATANGAS
+form5_2015,provcode,Name of Provinces,11,BENGUET
+form5_2015,provcode,Name of Provinces,12,BOHOL
+form5_2015,provcode,Name of Provinces,13,BUKIDNON
+form5_2015,provcode,Name of Provinces,14,BULACAN
+form5_2015,provcode,Name of Provinces,15,CAGAYAN
+form5_2015,provcode,Name of Provinces,16,CAMARINES NORTE
+form5_2015,provcode,Name of Provinces,17,CAMARINES SUR
+form5_2015,provcode,Name of Provinces,18,CAMIGUIN
+form5_2015,provcode,Name of Provinces,19,CAPIZ
+form5_2015,provcode,Name of Provinces,20,CATANDUANES
+form5_2015,provcode,Name of Provinces,21,CAVITE
+form5_2015,provcode,Name of Provinces,22,CEBU
+form5_2015,provcode,Name of Provinces,23,DAVAO (DAVAO DEL NORTE)
+form5_2015,provcode,Name of Provinces,24,DAVAO DEL SUR
+form5_2015,provcode,Name of Provinces,25,DAVAO ORIENTAL
+form5_2015,provcode,Name of Provinces,26,EASTERN SAMAR
+form5_2015,provcode,Name of Provinces,27,IFUGAO
+form5_2015,provcode,Name of Provinces,28,ILOCOS NORTE
+form5_2015,provcode,Name of Provinces,29,ILOCOS SUR
+form5_2015,provcode,Name of Provinces,30,ILOILO
+form5_2015,provcode,Name of Provinces,31,ISABELA
+form5_2015,provcode,Name of Provinces,32,KALINGA
+form5_2015,provcode,Name of Provinces,33,LA UNION
+form5_2015,provcode,Name of Provinces,34,LAGUNA
+form5_2015,provcode,Name of Provinces,35,LANAO DEL NORTE
+form5_2015,provcode,Name of Provinces,36,LANAO DEL SUR
+form5_2015,provcode,Name of Provinces,37,LEYTE
+form5_2015,provcode,Name of Provinces,38,MAGUINDANAO
+form5_2015,provcode,Name of Provinces,39,NCR - MANILA FIRST DISTRICT
+form5_2015,provcode,Name of Provinces,40,MARINDUQUE
+form5_2015,provcode,Name of Provinces,41,MASBATE
+form5_2015,provcode,Name of Provinces,42,MISAMIS OCCIDENTAL
+form5_2015,provcode,Name of Provinces,43,MISAMIS ORIENTAL
+form5_2015,provcode,Name of Provinces,44,MOUNTAIN PROVINCE
+form5_2015,provcode,Name of Provinces,45,NEGROS OCCIDENTAL
+form5_2015,provcode,Name of Provinces,46,NEGROS ORIENTAL
+form5_2015,provcode,Name of Provinces,47,NORTH COTABATO
+form5_2015,provcode,Name of Provinces,48,NORTHERN SAMAR
+form5_2015,provcode,Name of Provinces,49,NUEVA ECIJA
+form5_2015,provcode,Name of Provinces,50,NUEVA VIZCAYA
+form5_2015,provcode,Name of Provinces,51,OCCIDENTAL MINDORO
+form5_2015,provcode,Name of Provinces,52,ORIENTAL MINDORO
+form5_2015,provcode,Name of Provinces,53,PALAWAN
+form5_2015,provcode,Name of Provinces,54,PAMPANGA
+form5_2015,provcode,Name of Provinces,55,PANGASINAN
+form5_2015,provcode,Name of Provinces,56,QUEZON
+form5_2015,provcode,Name of Provinces,57,QUIRINO
+form5_2015,provcode,Name of Provinces,58,RIZAL
+form5_2015,provcode,Name of Provinces,59,ROMBLON
+form5_2015,provcode,Name of Provinces,60,WESTERN SAMAR
+form5_2015,provcode,Name of Provinces,61,SIQUIJOR
+form5_2015,provcode,Name of Provinces,62,SORSOGON
+form5_2015,provcode,Name of Provinces,63,SOUTH COTABATO
+form5_2015,provcode,Name of Provinces,64,SOUTHERN LEYTE
+form5_2015,provcode,Name of Provinces,65,SULTAN KUDARAT
+form5_2015,provcode,Name of Provinces,66,SULU
+form5_2015,provcode,Name of Provinces,67,SURIGAO DEL NORTE
+form5_2015,provcode,Name of Provinces,68,SURIGAO DEL SUR
+form5_2015,provcode,Name of Provinces,69,TARLAC
+form5_2015,provcode,Name of Provinces,70,TAWI-TAWI
+form5_2015,provcode,Name of Provinces,71,ZAMBALES
+form5_2015,provcode,Name of Provinces,72,ZAMBOANGA DEL NORTE
+form5_2015,provcode,Name of Provinces,73,ZAMBOANGA DEL SUR
+form5_2015,provcode,Name of Provinces,74,NCR SECOND DISTRICT
+form5_2015,provcode,Name of Provinces,75,NCR THIRD DISTRICT
+form5_2015,provcode,Name of Provinces,76,NCR FOURTH DISTRICT
+form5_2015,provcode,Name of Provinces,77,AURORA
+form5_2015,provcode,Name of Provinces,78,BILIRAN
+form5_2015,provcode,Name of Provinces,79,GUIMARAS
+form5_2015,provcode,Name of Provinces,80,SARANGANI
+form5_2015,provcode,Name of Provinces,81,APAYAO
+form5_2015,provcode,Name of Provinces,82,COMPOSTELA VALLEY
+form5_2015,provcode,Name of Provinces,83,ZAMBOANGA SIBUGAY
+form5_2015,provcode,Name of Provinces,97,ISABELA CITY
+form5_2015,provcode,Name of Provinces,98,COTABATO CITY
+form5_2015,psurec,Primary Sampling Unit,,
+form5_2015,regcode,Name of Regions,1,ILOCOS REGION
+form5_2015,regcode,Name of Regions,2,CAGAYAN VALLEY
+form5_2015,regcode,Name of Regions,3,CENTRAL LUZON
+form5_2015,regcode,Name of Regions,5,BICOL
+form5_2015,regcode,Name of Regions,6,WESTERN VISAYAS
+form5_2015,regcode,Name of Regions,7,CENTRAL VISAYAS
+form5_2015,regcode,Name of Regions,8,EASTERN VISAYAS
+form5_2015,regcode,Name of Regions,9,ZAMBOANGA PENINSULA
+form5_2015,regcode,Name of Regions,10,NORTHERN MINDANAO
+form5_2015,regcode,Name of Regions,11,DAVAO REGION
+form5_2015,regcode,Name of Regions,12,SOCCSKSARGEN
+form5_2015,regcode,Name of Regions,13,NATIONAL CAPITAL REGION
+form5_2015,regcode,Name of Regions,14,CORDILLERA ADMINISTRATIVE REGION
+form5_2015,regcode,Name of Regions,15,ARMM
+form5_2015,regcode,Name of Regions,16,CARAGA
+form5_2015,regcode,Name of Regions,41,CALABARZON
+form5_2015,regcode,Name of Regions,42,MIMAROPA
+form5_2015,strrec,Strata,,
+form5_2015,Total_Calcium,Total Calcium (mg),,
+form5_2015,Total_CHO,Total Carbohydrates (g),,
+form5_2015,fg5,Starchy Roots and Tubers (in grams),,
+form5_2015,Total_Fat,Total Fats (g),,
+form5_2015,Total_FoodIntake,Total Food Intake  (in grams),,
+form5_2015,Total_Iron,Total Iron (mg),,
+form5_2015,Total_Niacin,Total Niacin (mg),,
+form5_2015,Total_Protein,Total Protein (g),,
+form5_2015,Total_Riboflavin,Total Riboflavin (mg),,
+form5_2015,Total_Thiamin,Total Thiamin (mg),,
+form5_2015,Total_VitaminA,Total Vitamin A (mcg RE),,
+form5_2015,Total_VitaminC,Total Vitamin C (mg),,
+form5_2015,wgts,Sampling Weights,,
+form5_2015,fg19,Milk and Milk Products (in grams),,
+form5_2015,fg1,Cereals and Cereal Products (in grams),,
+form5_2015,fg10,Other Vegetables (in grams),,
+form5_2015,fg11,Fruits (in grams),,
+form5_2015,fg12,Vitamin C-Rich Fruits (in grams),,
+form5_2015,fg13,Other Fruits (in grams),,
+form5_2015,fg14,Fish, Meat and Poultry (in grams),,
+form5_2015,fg15,Fish and Fish Products  (in grams),,
+form5_2015,fg16,Meat and Meat Products (in grams),,
+form5_2015,fg17,Poultry (in grams),,
+form5_2015,fg18,Eggs (in grams),,
+form5_2015,cu,Consumption Unit,,
+form5_2015,fg2,Rice and Rice Products (in grams),,
+form5_2015,fg20,Whole Milk (in grams),,
+form5_2015,fg21,Milk Products (in grams),,
+form5_2015,fg23,Fats and Oils (in grams),,
+form5_2015,fg24,Miscellaneous (in grams),,
+form5_2015,fg25,Beverages (in grams),,
+form5_2015,fg26,Condiments and Spices (in grams),,
+form5_2015,fg27,Other Miscellaneous (in grams),,
+form5_2015,fg3,Corn and Corn Products (in grams),,
+form5_2015,fg4,Other Cereal Products (in grams),,
