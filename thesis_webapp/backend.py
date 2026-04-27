@@ -59,18 +59,45 @@ RANGE_HINTS = {
     "waist": (40.0, 180.0, 0.5),
     "hip": (40.0, 180.0, 0.5),
     "BMI": (10.0, 60.0, 0.1),
-    "Total_Food_epwt": (0.0, 40.0, 0.5),
-    "Total_Ener": (0.0, 5000.0, 10.0),
-    "Total_Prot": (0.0, 250.0, 1.0),
-    "Total_Calc": (0.0, 2500.0, 10.0),
-    "Total_Iron": (0.0, 50.0, 0.5),
-    "Total_VitA": (0.0, 5000.0, 10.0),
-    "Total_VitC": (0.0, 2000.0, 10.0),
-    "Total_Thia": (0.0, 20.0, 0.1),
-    "Total_Ribo": (0.0, 20.0, 0.1),
-    "Total_Nia": (0.0, 100.0, 0.5),
-    "Total_CHO": (0.0, 1000.0, 5.0),
-    "Total_Fat": (0.0, 300.0, 1.0),
+    "Total_Food_epwt": (0.0, 1760.0, 5.0),
+    "Total_Ener": (0.0, 3890.0, 10.0),
+    "Total_Prot": (0.0, 150.0, 1.0),
+    "Total_Calc": (0.0, 1270.0, 10.0),
+    "Total_Iron": (0.0, 30.0, 0.5),
+    "Total_VitA": (0.0, 4810.0, 10.0),
+    "Total_VitC": (0.0, 190.0, 1.0),
+    "Total_Thia": (0.0, 10.0, 0.05),
+    "Total_Ribo": (0.0, 10.0, 0.05),
+    "Total_Nia": (0.0, 50.0, 0.5),
+    "Total_CHO": (0.0, 710.0, 5.0),
+    "Total_Fat": (0.0, 120.0, 1.0),
+    # Dietary food-group weights (edible-portion grams) – maxima from dataset p99 × 1.1
+    "epwt_fg1": (0.0, 870.0, 1.0),
+    "epwt_fg2": (0.0, 790.0, 1.0),
+    "epwt_fg3": (0.0, 480.0, 1.0),
+    "epwt_fg4": (0.0, 340.0, 1.0),
+    "epwt_fg5": (0.0, 480.0, 1.0),
+    "epwt_fg6": (0.0, 690.0, 1.0),
+    "epwt_fg7": (0.0, 200.0, 1.0),
+    "epwt_fg8": (0.0, 440.0, 1.0),
+    "epwt_fg9": (0.0, 260.0, 1.0),
+    "epwt_fg10": (0.0, 400.0, 1.0),
+    "epwt_fg11": (0.0, 630.0, 1.0),
+    "epwt_fg12": (0.0, 550.0, 1.0),
+    "epwt_fg13": (0.0, 600.0, 1.0),
+    "epwt_fg14": (0.0, 530.0, 1.0),
+    "epwt_fg15": (0.0, 360.0, 1.0),
+    "epwt_fg16": (0.0, 510.0, 1.0),
+    "epwt_fg17": (0.0, 380.0, 1.0),
+    "epwt_fg18": (0.0, 180.0, 1.0),
+    "epwt_fg19": (0.0, 270.0, 1.0),
+    "epwt_fg20": (0.0, 240.0, 1.0),
+    "epwt_fg21": (0.0, 320.0, 1.0),
+    "epwt_fg23": (0.0, 60.0, 0.5),
+    "epwt_fg24": (0.0, 590.0, 1.0),
+    "epwt_fg25": (0.0, 590.0, 1.0),
+    "epwt_fg26": (0.0, 60.0, 0.5),
+    "epwt_fg27": (0.0, 550.0, 1.0),
 }
 
 
@@ -183,7 +210,7 @@ def feature_range(feature_name: str) -> tuple[float, float, float]:
     if feature_name in RANGE_HINTS:
         return RANGE_HINTS[feature_name]
     if feature_name.startswith("epwt_fg"):
-        return (0.0, 20.0, 0.1)
+        return (0.0, 500.0, 1.0)  # safe fallback for unmapped food groups
     if feature_name.startswith("Total_"):
         return (0.0, 5000.0, 1.0)
     if feature_name.endswith("_nan"):
