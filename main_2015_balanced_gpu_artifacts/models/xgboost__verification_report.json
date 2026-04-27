@@ -1,0 +1,19 @@
+{
+  "verification_status": "PASSED",
+  "model_file": "c:\\Jon\\College\\Thesis\\V2.2.1.1\\main_2015_balanced_gpu_artifacts\\models\\xgboost__best_single_model.joblib",
+  "metadata_file": "c:\\Jon\\College\\Thesis\\V2.2.1.1\\main_2015_balanced_gpu_artifacts\\models\\xgboost__best_single_model_metadata.json",
+  "model_type": "xgboost",
+  "balance_strategy": "base",
+  "test_set_size": 22679,
+  "test_metrics": {
+    "accuracy": 0.7698752149565677,
+    "precision": 0.654265554842848,
+    "recall": 0.6689401888772298,
+    "f1": 0.6615214994487321,
+    "auc": 0.8441889357769327,
+    "logloss": 0.45219377012201317
+  },
+  "max_prediction_difference": 0.0,
+  "mean_prediction_difference": 0.0,
+  "verified_at": "2026-04-27T22:38:13.095126"
+}
