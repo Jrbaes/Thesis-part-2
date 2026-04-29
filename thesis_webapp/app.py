@@ -28,7 +28,7 @@ from backend import (
 
 st.set_page_config(
     page_title="Hypertension Risk Studio",
-    page_icon="🩺",
+    page_icon="",
     layout="wide",
         initial_sidebar_state="collapsed",
 )
@@ -384,12 +384,13 @@ st.markdown(
             .landing-hero {
                 background: linear-gradient(145deg, #0f172a 0%, #7f1d1d 55%, #1e3a5f 100%);
                 color: #fff;
-                padding: 5.5rem 2rem 4.5rem;
+                padding: 6.75rem 2rem 5.75rem;
                 text-align: center;
                 position: relative;
                 overflow: hidden;
                 border-radius: 0 0 56px 56px;
-                margin: -1rem -1rem 0;
+                margin: -1rem -1rem 2.6rem;
+                min-height: 29rem;
             }
             .landing-hero::before {
                 content: "";
@@ -400,10 +401,10 @@ st.markdown(
                     radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22) 0%, transparent 44%);
                 pointer-events: none;
             }
-            .landing-hero-icon { font-size: 4.5rem; line-height: 1; margin-bottom: 1rem; position: relative; }
             .landing-hero h1 {
-                font-size: 3.2rem; font-weight: 800; letter-spacing: -0.04em;
-                margin: 0 0 0.65rem; position: relative;
+                font-size: 2.5rem; font-weight: 800; letter-spacing: -0.025em;
+                margin: 0 0 0.9rem; position: relative;
+                line-height: 1.2;
             }
             .landing-badge {
                 display: inline-block;
@@ -415,8 +416,11 @@ st.markdown(
                 margin-bottom: 1.4rem; position: relative;
             }
             .landing-sub {
-                font-size: 1.18rem; color: rgba(255,255,255,0.82);
-                max-width: 640px; margin: 0 auto 2.8rem; line-height: 1.68; position: relative;
+                font-size: 1.08rem; color: rgba(255,255,255,0.90);
+                max-width: 760px; margin: 0 auto; line-height: 1.72; position: relative;
+                text-align: center;
+                display: block;
+                width: 100%;
             }
             .feature-cards {
                 display: flex; gap: 1.2rem; justify-content: center;
@@ -1202,40 +1206,10 @@ if not st.session_state.show_form:
         """
         <div class="landing-hero">
           <div class="landing-badge">Philippine 2015 FNRI Thesis Model</div>
-          <div class="landing-hero-icon">🩺</div>
-          <h1>Hypertension Risk Assessment</h1>
-          <p class="landing-sub">
-            Estimate hypertension risk from dietary, anthropometric, and clinical variables,
-            then review the calibrated probability, Venn-Abers uncertainty interval, and model explanations.
+                    <h1>HRP-AI: A WEB APPLICATION FOR HYPERTENSION<br>RISK PREDICTION WITH CALIBRATED<br>EXPLAINABLE AI</h1>
+          <p class="landing-sub" style="text-align:center;margin:0 auto;width:100%;">
+            A thesis-focused decision support interface for estimating hypertension risk using dietary, anthropometric, and clinical inputs, with calibrated probabilities and transparent explainability outputs.
           </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="feature-cards">
-          <div class="feature-card">
-            <div class="fc-icon">AI</div>
-            <div class="fc-title">Risk Scoring</div>
-            <div class="fc-desc">Run the exported thesis model with the same survey-aligned variables.</div>
-          </div>
-          <div class="feature-card">
-            <div class="fc-icon">VA</div>
-            <div class="fc-title">Uncertainty</div>
-            <div class="fc-desc">See a lower and upper risk interval from Venn-Abers calibration.</div>
-          </div>
-          <div class="feature-card">
-            <div class="fc-icon">SH</div>
-            <div class="fc-title">Explainability</div>
-            <div class="fc-desc">Inspect SHAP and LIME outputs for the submitted case.</div>
-          </div>
-          <div class="feature-card">
-            <div class="fc-icon">FN</div>
-            <div class="fc-title">Survey Inputs</div>
-            <div class="fc-desc">Use coded-choice labels and data-dictionary descriptions while entering values.</div>
-          </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1260,7 +1234,6 @@ else:
     with nav_left:
         st.markdown(
             "<div style='display:flex;align-items:center;gap:0.7rem;padding:0.5rem 0;'>"
-            "<span style='font-size:1.6rem;'>🩺</span>"
             "<span style='font-size:1.2rem;font-weight:700;color:#0f172a;'>Hypertension Risk Studio</span>"
             "</div>",
             unsafe_allow_html=True,
