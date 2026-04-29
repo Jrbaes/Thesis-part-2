@@ -1205,7 +1205,7 @@ if not st.session_state.show_form:
     st.markdown(
         """
         <div class="landing-hero">
-          <div class="landing-badge">Philippine 2015 FNRI Thesis Model</div>
+          <div class="landing-badge">Philippine 2015 DOST-FNRI Thesis Model</div>
                     <h1>HRP-AI: A WEB APPLICATION FOR HYPERTENSION<br>RISK PREDICTION WITH CALIBRATED<br>EXPLAINABLE AI</h1>
           <p class="landing-sub" style="text-align:center;margin:0 auto;width:100%;">
             A thesis-focused decision support interface for estimating hypertension risk using dietary, anthropometric, and clinical inputs, with calibrated probabilities and transparent explainability outputs.
