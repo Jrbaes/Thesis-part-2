@@ -1,0 +1,3 @@
+optimization_priority,config_name,model_family,balance_method,selected_calibration,operating_threshold,test_accuracy,test_precision,test_recall,test_f1,test_ece,test_log_loss
+recall_priority,CatBoost_GPU__adasyn,CatBoost_GPU,adasyn,platt,0.21999999999999997,0.5919372101320014,0.5579315391495243,0.9605263157894737,0.7058581494625314,0.01582890037507487,0.6071759939039005
+accuracy_priority,LightGBM_GPU__smote_cw,LightGBM_GPU,smote_cw,platt,0.20999999999999996,0.5865858009275776,0.5540605478135512,0.9683650615901456,0.7048395313295975,0.012131598419814007,0.605899508927491

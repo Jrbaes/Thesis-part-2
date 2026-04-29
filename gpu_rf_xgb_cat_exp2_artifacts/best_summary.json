@@ -1,0 +1,13 @@
+{
+  "best_model": "xgboost",
+  "best_calibration_method": "venn_abers",
+  "selected_threshold": 0.35,
+  "test_accuracy": 0.7602187045284183,
+  "test_recall": 0.8268625393494229,
+  "test_precision": 0.6048743043561696,
+  "test_f1": 0.6986589826000221,
+  "test_auc": 0.8459176836036317,
+  "test_logloss": 0.4511097690716332,
+  "test_ece": 0.016054641690943953,
+  "best_model_joblib": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/best_model.joblib"
+}
