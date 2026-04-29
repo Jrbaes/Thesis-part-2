@@ -1,2 +1,2 @@
-best_model,calibration_method,test_accuracy,test_precision,test_recall,test_f1,test_auc,test_logloss,best_k_imputer,collinearity_threshold
-CatBoost_GPU,isotonic,0.7014848646618028,0.5719786972552233,0.4141797686146544,0.480454232622161,0.7475513222734806,0.5413730266863913,11,0.7
+best_model,calibration_method,decision_threshold,test_accuracy,test_precision,test_recall,test_f1,test_auc,test_logloss,best_k_imputer,collinearity_threshold
+AdaBoost_CPU,venn_abers,0.39,0.6699290191193625,0.5036279237460003,0.6630080094927321,0.5724311033705562,0.7364293359892358,0.5510633486279662,11,0.7
