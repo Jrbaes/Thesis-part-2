@@ -2,12 +2,35 @@
   "best_model": "xgboost",
   "best_calibration_method": "venn_abers",
   "selected_threshold": 0.35,
-  "test_accuracy": 0.7602187045284183,
-  "test_recall": 0.8268625393494229,
-  "test_precision": 0.6048743043561696,
-  "test_f1": 0.6986589826000221,
-  "test_auc": 0.8459176836036317,
-  "test_logloss": 0.4511097690716332,
-  "test_ece": 0.016054641690943953,
-  "best_model_joblib": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/best_model.joblib"
+  "test_accuracy": 0.7590281758454959,
+  "test_recall": 0.8323714585519413,
+  "test_precision": 0.6024874204879901,
+  "test_f1": 0.6990141543206477,
+  "test_auc": 0.8458644466616461,
+  "test_logloss": 0.4531130578709675,
+  "test_ece": 0.016300350220928444,
+  "best_model_joblib": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/best_model.joblib",
+  "saved_top_calibrated_joblibs": [
+    {
+      "rank": 1,
+      "model": "xgboost",
+      "method": "venn_abers",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/calibrated_top_models/top1_xgboost_venn_abers.joblib"
+    },
+    {
+      "rank": 2,
+      "model": "xgboost",
+      "method": "base",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/calibrated_top_models/top2_xgboost_base.joblib"
+    },
+    {
+      "rank": 3,
+      "model": "catboost",
+      "method": "isotonic",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_artifacts/models/calibrated_top_models/top3_catboost_isotonic.joblib"
+    }
+  ]
 }
