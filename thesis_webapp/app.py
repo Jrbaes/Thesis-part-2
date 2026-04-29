@@ -27,7 +27,7 @@ from backend import (
 
 
 st.set_page_config(
-    page_title="Hypertension Risk Studio",
+    page_title="Hypertension Risk Assesment",
     page_icon="",
     layout="wide",
         initial_sidebar_state="collapsed",
@@ -379,7 +379,25 @@ st.markdown(
                     linear-gradient(180deg, #f8f5f2 0%, #f2ede8 45%, #fcfbfa 100%);
                 color: #18212f;
             }
+            #MainMenu,
+            header,
+            footer,
+            .stAppHeader,
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            [data-testid="stDecoration"] {
+                visibility: hidden !important;
+                display: none !important;
+                height: 0 !important;
+            }
             .block-container { padding-top: 0 !important; }
+            [data-testid="stAppViewContainer"] > .main {
+                padding-top: 0 !important;
+            }
+            [data-testid="stAppViewContainer"] .main .block-container {
+                padding-top: 0 !important;
+                margin-top: 0 !important;
+            }
             /* ── Landing ── */
             .landing-hero {
                 background: linear-gradient(145deg, #0f172a 0%, #7f1d1d 55%, #1e3a5f 100%);
@@ -389,7 +407,7 @@ st.markdown(
                 position: relative;
                 overflow: hidden;
                 border-radius: 0 0 56px 56px;
-                margin: -1rem -1rem 2.6rem;
+                margin: -2.75rem -1rem 2.6rem;
                 min-height: 29rem;
             }
             .landing-hero::before {
@@ -653,6 +671,7 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
     default_value = feature_default(feature_name)
     help_text = field_help_text(feature_name, dictionary_labels)
     display_label = field_display_label(feature_name, dictionary_labels)
+    widget_key = f"input_{feature_name}"
     is_food_group_field = feature_name.startswith("fg") or feature_name.startswith("epwt_fg")
     is_total_field = feature_name.startswith("Total_")
     force_numeric_input = is_food_group_field or is_total_field
@@ -721,18 +740,20 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
             return float("nan")
 
     numeric_value = st.number_input(
-        display_label,
+        (
+            f"{display_label} (Filipino Average {display_label} Value)"
+            if np.isfinite(float(default_value))
+            and np.isclose(float(st.session_state.get(widget_key, default_value)), float(default_value))
+            else display_label
+        ),
         min_value=float(minimum),
         max_value=float(maximum),
         value=float(default_value),
         step=float(step),
         format="%.2f",
-        key=f"input_{feature_name}",
+        key=widget_key,
         help=help_text,
     )
-
-    if feature_name in AVERAGE_DEFAULT_NOTICE_FIELDS and np.isclose(float(numeric_value), float(default_value)):
-        st.caption("Current input is the average default value. Enter your actual value to replace it.")
 
     return float(numeric_value)
 
@@ -853,7 +874,7 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
         with cols[index % 3]:
             if feature == "weight":
                 values["weight"] = st.number_input(
-                    "Weight",
+                    "Weight (Filipino Average Weight Value)" if np.isclose(float(st.session_state.get("raw_weight", 68.0)), 68.0) else "Weight",
                     min_value=20.0,
                     max_value=300.0,
                     value=68.0,
@@ -863,7 +884,7 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
                 )
             elif feature == "height":
                 values["height"] = st.number_input(
-                    "Height",
+                    "Height (Filipino Average Height Value)" if np.isclose(float(st.session_state.get("raw_height", 165.0)), 165.0) else "Height",
                     min_value=0.8,
                     max_value=260.0,
                     value=165.0,
@@ -873,7 +894,7 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
                 )
             elif feature == "waist":
                 values["waist"] = st.number_input(
-                    "Waist Circumference",
+                    "Waist Circumference (Filipino Average Waist Circumference Value)" if np.isclose(float(st.session_state.get("raw_waist", 84.0)), 84.0) else "Waist Circumference",
                     min_value=30.0,
                     max_value=200.0,
                     value=84.0,
@@ -883,7 +904,7 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
                 )
             elif feature == "hip":
                 values["hip"] = st.number_input(
-                    "Hip Circumference",
+                    "Hip Circumference (Filipino Average Hip Circumference Value)" if np.isclose(float(st.session_state.get("raw_hip", 96.0)), 96.0) else "Hip Circumference",
                     min_value=30.0,
                     max_value=200.0,
                     value=96.0,
@@ -1234,7 +1255,7 @@ else:
     with nav_left:
         st.markdown(
             "<div style='display:flex;align-items:center;gap:0.7rem;padding:0.5rem 0;'>"
-            "<span style='font-size:1.2rem;font-weight:700;color:#0f172a;'>Hypertension Risk Studio</span>"
+            "<span style='font-size:1.2rem;font-weight:700;color:#0f172a;'>Hypertension Risk Assesment</span>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -1248,7 +1269,7 @@ else:
 
     st.markdown(
         "<div id='input-section' class='section-header'>"
-        "<h2>Patient / Survey Variables</h2>"
+        "<h2>Patient Details</h2>"
         "<p>Complete all sections below. Use the question-mark hover next to each field for definitions and guidance."
         " Click Predict My Risk to see the output below this form on the same page.</p>"
         "</div>",
