@@ -1,0 +1,13 @@
+{
+  "best_model": "AdaBoost_CPU",
+  "calibration_method": "venn_abers",
+  "decision_threshold": 0.39,
+  "test_accuracy": 0.6699290191193625,
+  "test_precision": 0.5036279237460003,
+  "test_recall": 0.6630080094927321,
+  "test_f1": 0.5724311033705562,
+  "test_auc": 0.7364293359892358,
+  "test_logloss": 0.5510633486279662,
+  "best_k_imputer": 11,
+  "collinearity_threshold": 0.7
+}

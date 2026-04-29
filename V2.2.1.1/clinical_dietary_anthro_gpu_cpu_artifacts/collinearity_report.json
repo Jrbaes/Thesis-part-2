@@ -1,0 +1,43 @@
+{
+  "threshold": 0.7,
+  "n_high_corr_pairs": 21,
+  "manual_collinearity_drops": [
+    "Total_Energy",
+    "Total_Protein",
+    "Total_Fat",
+    "Total_Iron",
+    "Total_CHO",
+    "Total_Niacin",
+    "Total_Riboflavin",
+    "hip",
+    "waist",
+    "chol"
+  ],
+  "auto_collinearity_drops": [
+    "Total_CHO",
+    "Total_Calcium",
+    "Total_Niacin",
+    "Total_Protein",
+    "Total_Riboflavin",
+    "Total_Thiamin",
+    "Total_VitaminA",
+    "chol",
+    "hip",
+    "waist"
+  ],
+  "final_collinearity_drops": [
+    "Total_CHO",
+    "Total_Calcium",
+    "Total_Energy",
+    "Total_Fat",
+    "Total_Iron",
+    "Total_Niacin",
+    "Total_Protein",
+    "Total_Riboflavin",
+    "Total_Thiamin",
+    "Total_VitaminA",
+    "chol",
+    "hip",
+    "waist"
+  ]
+}

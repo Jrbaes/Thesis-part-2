@@ -1,0 +1,15 @@
+{
+  "model": "xgboost",
+  "balance_strategy": "base",
+  "source": "artifact:all_models_calibrated_metrics_2015_rebuild.csv",
+  "params": {
+    "colsample_bytree": 0.9449080677680503,
+    "gamma": 0.32993815394311254,
+    "learning_rate": 0.10506492740498463,
+    "max_depth": 4,
+    "min_child_weight": 10,
+    "reg_lambda": 0.005034561917116735,
+    "subsample": 0.9227930841566909
+  },
+  "saved_at": "2026-04-27T22:33:53.150045"
+}
