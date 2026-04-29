@@ -648,7 +648,7 @@ def render_top_age_sex_fields(
                 "Sex",
                 options=[None, 1, 2],
                 index=0,
-                format_func=lambda v: "missing/use default" if v is None else ("Male" if v == 1 else "Female"),
+                format_func=lambda v: "missing" if v is None else ("Male" if v == 1 else "Female"),
                 help="Biological sex.",
             )
             widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
@@ -679,27 +679,24 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
     value_label_map = field_value_labels(feature_name, dictionary_value_labels)
 
     if feature_name == "age":
-        age_mode = st.selectbox(
+        age_text = st.text_input(
             display_label,
-            options=[None, "provided"],
-            index=0,
-            key=f"input_{feature_name}_mode",
+            value=st.session_state.get("input_age_text", ""),
+            key="input_age_text",
             help=help_text,
-            format_func=lambda value: "missing" if value is None else "enter age",
+            placeholder="Leave blank for missing",
         )
-        if age_mode is None:
+        if age_text is None or not age_text.strip():
             return float("nan")
-        age_value = st.number_input(
-            "Enter Age",
-            min_value=int(round(minimum)),
-            max_value=int(round(maximum)),
-            value=int(round(default_value)),
-            step=1,
-            format="%d",
-            key=f"input_{feature_name}",
-            help=help_text,
-        )
-        return float(int(age_value))
+        try:
+            age_value = int(round(float(age_text)))
+        except ValueError:
+            st.warning("Please enter a valid numeric age or leave it blank.")
+            return float("nan")
+        if age_value < int(round(minimum)) or age_value > int(round(maximum)):
+            st.warning(f"Age must be between {int(round(minimum))} and {int(round(maximum))}.")
+            return float("nan")
+        return float(age_value)
 
     if feature_name in AUTO_COMPUTED_TOTAL_FIELDS:
         st.number_input(
@@ -721,7 +718,7 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
 
         def _format_choice(choice: str | None) -> str:
             if choice is None:
-                return "missing/use default"
+                return "missing"
             return f"{choice} - {value_label_map.get(choice, '')}".strip(" -")
 
         selected = st.selectbox(
