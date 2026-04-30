@@ -14,15 +14,20 @@ import streamlit.components.v1 as components
 from backend import (
     DEFAULT_CALIBRATOR_PATH,
     DEFAULT_MODEL_PATH,
+    DEFAULT_PREPROCESSOR_PATH,
     build_input_values_from_widgets,
     feature_default,
     feature_range,
     group_feature_names,
     load_calibrator,
-    load_feature_names,
+    load_input_feature_names,
+    load_model_feature_names,
     load_model,
+    load_preprocessor,
     make_input_frame,
+    prepare_model_input,
     predict_with_venn_abers,
+    unwrap_model,
 )
 
 
@@ -497,11 +502,13 @@ st.markdown(
 
 
 @st.cache_resource(show_spinner=False)
-def load_artifacts(model_path: str, calibrator_path: str):
+def load_artifacts(model_path: str, calibrator_path: str, preprocessor_path: str):
     model = load_model(Path(model_path))
     calibrator = load_calibrator(Path(calibrator_path))
-    feature_names = load_feature_names(model)
-    return model, calibrator, feature_names
+    preprocessor = load_preprocessor(Path(preprocessor_path))
+    input_feature_names = load_input_feature_names(model, preprocessor)
+    model_feature_names = load_model_feature_names(model, preprocessor)
+    return model, calibrator, preprocessor, input_feature_names, model_feature_names
 
 
 @st.cache_data(show_spinner=False)
@@ -1103,9 +1110,13 @@ def _try_compute_lime(model: Any, feature_names: list[str], input_frame: pd.Data
             random_state=42,
         )
 
+        def _lime_predict(nd_array: np.ndarray) -> np.ndarray:
+            frame = pd.DataFrame(nd_array, columns=feature_names)
+            return np.asarray(model.predict_proba(frame))
+
         explanation = explainer.explain_instance(
             data_row=input_frame.iloc[0].values,
-            predict_fn=model.predict_proba,
+            predict_fn=_lime_predict,
             num_features=min(12, len(feature_names)),
             top_labels=1,
         )
@@ -1203,10 +1214,12 @@ if "scored" not in st.session_state:
 
 model_path = str(DEFAULT_MODEL_PATH)
 calibrator_path = str(DEFAULT_CALIBRATOR_PATH)
+preprocessor_path = str(DEFAULT_PREPROCESSOR_PATH)
 
 with st.sidebar:
     st.subheader("Model artifacts")
     model_path = st.text_input("Stand-in model joblib", value=model_path)
+    preprocessor_path = st.text_input("Preprocessor joblib", value=preprocessor_path)
     calibrator_path = st.text_input("Venn-Abers calibrator", value=calibrator_path)
     st.caption("Replace these paths when your final exported artifacts are ready.")
     st.divider()
@@ -1214,7 +1227,13 @@ with st.sidebar:
     st.caption("Install `shap` and `lime` to enable explainability outputs.")
 
 
-model, calibrator, feature_names = load_artifacts(model_path, calibrator_path)
+model, calibrator, preprocessor, input_feature_names, model_feature_names = load_artifacts(
+    model_path,
+    calibrator_path,
+    preprocessor_path,
+)
+explain_model = unwrap_model(model)
+feature_names = input_feature_names
 grouped_features = group_feature_names(feature_names)
 dictionary_labels, dictionary_value_labels = load_dataset_dictionaries()
 
@@ -1425,6 +1444,7 @@ else:
         st.session_state.scored = False
         st.session_state.pop("_result", None)
         st.session_state.pop("_input_frame", None)
+        st.session_state.pop("_model_feature_names", None)
 
     st.markdown("<br>", unsafe_allow_html=True)
     _, submit_col, _ = st.columns([1.3, 1.2, 1.3])
@@ -1476,11 +1496,13 @@ else:
     if submitted and not missing_field_labels:
         derived_widget_values = apply_dietary_derived_totals(widget_values, feature_names)
         input_values = build_input_values_from_widgets(feature_names, derived_widget_values)
-        input_frame = make_input_frame(feature_names, input_values)
-        result = predict_with_venn_abers(model, input_frame, calibrator)
+        raw_input_frame = make_input_frame(feature_names, input_values)
+        model_input_frame = prepare_model_input(raw_input_frame, preprocessor)
+        result = predict_with_venn_abers(model, model_input_frame, calibrator)
         st.session_state.scored = True
         st.session_state._result = result
-        st.session_state._input_frame = input_frame
+        st.session_state._input_frame = model_input_frame
+        st.session_state._model_feature_names = list(model_input_frame.columns)
         st.session_state._scroll_to_output = True
 
     if st.session_state.scored and hasattr(st.session_state, "_result"):
@@ -1551,8 +1573,9 @@ else:
         )
 
         with st.spinner("Computing SHAP and LIME explanations..."):
-            shap_local_df, shap_global_df, shap_error = _try_compute_shap(model, feature_names, input_frame)
-            lime_df, lime_error = _try_compute_lime(model, feature_names, input_frame)
+            explain_feature_names = st.session_state.get("_model_feature_names", model_feature_names)
+            shap_local_df, shap_global_df, shap_error = _try_compute_shap(explain_model, explain_feature_names, input_frame)
+            lime_df, lime_error = _try_compute_lime(explain_model, explain_feature_names, input_frame)
 
         exp_a, exp_b, exp_c = st.columns(3)
 
@@ -1585,16 +1608,26 @@ else:
             elif shap_global_df is not None and not shap_global_df.empty:
                 global_top = shap_global_df.head(12)
                 st.dataframe(global_top, use_container_width=True, hide_index=True)
-                chart_df = global_top.head(10).iloc[::-1]
+                chart_df = global_top.head(10)
                 st.plotly_chart(
                     go.Figure(
-                        go.Bar(
-                            x=chart_df["mean_abs_shap"],
-                            y=chart_df["feature"],
-                            orientation="h",
-                            marker_color="#7c3aed",
+                        go.Waterfall(
+                            orientation="v",
+                            measure=["relative"] * len(chart_df),
+                            x=chart_df["feature"],
+                            y=chart_df["mean_abs_shap"],
+                            connector={"line": {"color": "#9ca3af"}},
+                            increasing={"marker": {"color": "#7c3aed"}},
+                            decreasing={"marker": {"color": "#7c3aed"}},
+                            text=[f"{v:.4f}" for v in chart_df["mean_abs_shap"]],
+                            textposition="outside",
                         )
-                    ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
+                    ).update_layout(
+                        height=320,
+                        margin=dict(l=10, r=10, t=10, b=60),
+                        xaxis_tickangle=-40,
+                        showlegend=False,
+                    ),
                     use_container_width=True,
                 )
             else:
