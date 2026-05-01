@@ -11,10 +11,17 @@ from venn_abers import VennAbers
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "models" / "XGBoost__baseline_rank1.joblib"
+DEFAULT_MODEL_PATH = (
+    PROJECT_ROOT
+    / "gpu_rf_xgb_cat_exp2_artifacts"
+    / "models"
+    / "calibrated_top_models"
+    / "top3_catboost_isotonic.joblib"
+)
 DEFAULT_CALIBRATOR_PATH = (
     PROJECT_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib"
 )
+DEFAULT_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
 
 ONE_HOT_GROUPS = {
     "alcohol_level": ["0.0", "1.0", "2.0", "3.0", "nan"],
@@ -122,7 +129,20 @@ def load_calibrator(calibrator_path: Path | str = DEFAULT_CALIBRATOR_PATH):
     return joblib.load(path)
 
 
+def load_preprocessor(preprocessor_path: Path | str = DEFAULT_PREPROCESSOR_PATH):
+    path = Path(preprocessor_path)
+    if not path.exists():
+        return None
+    return joblib.load(path)
+
+
 def load_feature_names(model: Any) -> list[str]:
+    if isinstance(model, dict):
+        feature_names = model.get("feature_names")
+        if feature_names:
+            return [str(name) for name in feature_names]
+        if "base_model" in model:
+            return load_feature_names(model["base_model"])
     if hasattr(model, "feature_names_in_"):
         return [str(name) for name in model.feature_names_in_]
     if hasattr(model, "named_steps"):
@@ -132,9 +152,53 @@ def load_feature_names(model: Any) -> list[str]:
     raise ValueError("The model does not expose feature names.")
 
 
+def unwrap_model(model: Any) -> Any:
+    if isinstance(model, dict) and "base_model" in model:
+        return model["base_model"]
+    return model
+
+
+def load_input_feature_names(model: Any, preprocessor: Any | None = None) -> list[str]:
+    if preprocessor is not None and hasattr(preprocessor, "feature_names_in_"):
+        return [str(name) for name in preprocessor.feature_names_in_]
+    return load_feature_names(model)
+
+
+def load_model_feature_names(model: Any, preprocessor: Any | None = None) -> list[str]:
+    if preprocessor is not None and hasattr(preprocessor, "get_feature_names_out"):
+        try:
+            return [str(name) for name in preprocessor.get_feature_names_out()]
+        except Exception:
+            pass
+    return load_feature_names(model)
+
+
 def make_input_frame(feature_names: list[str], values: dict[str, Any]) -> pd.DataFrame:
     row = {name: values.get(name, 0.0) for name in feature_names}
     return pd.DataFrame([row], columns=feature_names)
+
+
+def prepare_model_input(input_frame: pd.DataFrame, preprocessor: Any | None = None) -> pd.DataFrame:
+    if preprocessor is None:
+        return input_frame
+
+    transformed = preprocessor.transform(input_frame)
+    if hasattr(transformed, "toarray"):
+        transformed = transformed.toarray()
+
+    transformed = np.asarray(transformed)
+    if transformed.ndim == 1:
+        transformed = transformed.reshape(1, -1)
+
+    if hasattr(preprocessor, "get_feature_names_out"):
+        try:
+            columns = [str(name) for name in preprocessor.get_feature_names_out()]
+        except Exception:
+            columns = [f"feature_{index}" for index in range(transformed.shape[1])]
+    else:
+        columns = [f"feature_{index}" for index in range(transformed.shape[1])]
+
+    return pd.DataFrame(transformed, columns=columns)
 
 
 def score_to_label(score: float) -> str:
@@ -146,7 +210,8 @@ def score_to_label(score: float) -> str:
 
 
 def predict_probability(model: Any, input_frame: pd.DataFrame) -> float:
-    probabilities = model.predict_proba(input_frame)
+    base_model = unwrap_model(model)
+    probabilities = base_model.predict_proba(input_frame)
     return float(np.asarray(probabilities)[0, 1])
 
 
@@ -174,6 +239,38 @@ def predict_with_venn_abers(
     calibrator: Any | None = None,
 ) -> PredictionResult:
     raw_probability = predict_probability(model, input_frame)
+
+    if isinstance(model, dict):
+        method = str(model.get("calibration_method", "base"))
+        wrapped_calibrator = model.get("calibrator")
+
+        if method == "base" or wrapped_calibrator is None:
+            calibrated_probability = raw_probability
+            lower_bound = raw_probability
+            upper_bound = raw_probability
+        elif method in {"isotonic", "platt", "sigmoid"}:
+            calibrated_probability = float(np.clip(wrapped_calibrator.predict(np.array([raw_probability]))[0], 0.0, 1.0))
+            lower_bound = calibrated_probability
+            upper_bound = calibrated_probability
+        elif method == "venn_abers":
+            probability_pair = make_probability_pair(raw_probability)
+            calibrated_pair, p0_p1 = wrapped_calibrator.predict_proba(p_test=probability_pair)
+            calibrated_probability = float(calibrated_pair[0, 1])
+            lower_bound = float(np.clip(min(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
+            upper_bound = float(np.clip(max(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
+        else:
+            calibrated_probability = raw_probability
+            lower_bound = raw_probability
+            upper_bound = raw_probability
+
+        return PredictionResult(
+            raw_probability=raw_probability,
+            calibrated_probability=calibrated_probability,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            uncertainty_width=max(0.0, upper_bound - lower_bound),
+            risk_label=score_to_label(calibrated_probability),
+        )
 
     if calibrator is None:
         return PredictionResult(

@@ -1,0 +1,36 @@
+{
+  "best_model": "xgboost",
+  "best_calibration_method": "venn_abers",
+  "selected_threshold": 0.35,
+  "test_accuracy": 0.7503858194805767,
+  "test_recall": 0.8532266526757608,
+  "test_precision": 0.5888476509459581,
+  "test_f1": 0.696802527984575,
+  "test_auc": 0.8466026676234013,
+  "test_logloss": 0.45031553298308286,
+  "test_ece": 0.013062346096539477,
+  "best_model_joblib": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_clinical_anthro_only_artifacts/models/best_model.joblib",
+  "saved_top_calibrated_joblibs": [
+    {
+      "rank": 1,
+      "model": "xgboost",
+      "method": "venn_abers",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_clinical_anthro_only_artifacts/models/calibrated_top_models/top1_xgboost_venn_abers.joblib"
+    },
+    {
+      "rank": 2,
+      "model": "catboost",
+      "method": "base",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_clinical_anthro_only_artifacts/models/calibrated_top_models/top2_catboost_base.joblib"
+    },
+    {
+      "rank": 3,
+      "model": "catboost",
+      "method": "isotonic",
+      "selected_threshold": 0.35,
+      "path": "/workspace/Thesis-part-2/gpu_rf_xgb_cat_exp2_clinical_anthro_only_artifacts/models/calibrated_top_models/top3_catboost_isotonic.joblib"
+    }
+  ]
+}
