@@ -1,0 +1,11 @@
+feature_1,feature_2,corr,abs_corr
+num__sex,num__sex_anthro,1.0,1.0
+num__age,num__age_anthro,1.0,1.0
+num__age_anthro,num__agemos,0.9999999999999937,0.9999999999999937
+num__age,num__agemos,0.9999999999999937,0.9999999999999937
+num__sex_anthro,num__psc_anthro,-0.9999780792024283,0.9999780792024283
+num__sex,num__psc_anthro,-0.9999780792024283,0.9999780792024283
+num__strrec_anthro,num__regcode_anthro,0.8344863821424651,0.8344863821424651
+num__mos_lactation,num__agemos,0.7856981047925408,0.7856981047925408
+num__age,num__mos_lactation,0.7856981047837227,0.7856981047837227
+num__mos_lactation,num__age_anthro,0.7856981047837227,0.7856981047837227

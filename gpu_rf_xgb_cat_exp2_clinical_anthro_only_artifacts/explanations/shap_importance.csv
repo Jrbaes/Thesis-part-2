@@ -1,0 +1,14 @@
+feature,mean_abs_shap
+num__age,1.1049672
+num__bmi,0.40506175
+num__sex,0.23059238
+num__anthro_group,0.16973768
+num__strrec_anthro,0.14042145
+num__whr,0.09992232
+num__provcode_anthro,0.036383126
+num__cu,0.036061574
+num__fe_alcohol_level,0.03106199
+num__fe_smoking_level,0.02904985
+num__mos_preg,0.025281377
+num__psurec_anthro,0.018711701
+num__ethnicity,0.0037664778
