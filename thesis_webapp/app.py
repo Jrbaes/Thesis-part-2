@@ -15,6 +15,7 @@ from backend import (
     DEFAULT_CALIBRATOR_PATH,
     DEFAULT_MODEL_PATH,
     DEFAULT_PREPROCESSOR_PATH,
+    RANGE_HINTS,
     build_input_values_from_widgets,
     feature_default,
     feature_range,
@@ -25,10 +26,14 @@ from backend import (
     load_model,
     load_preprocessor,
     make_input_frame,
+    predict_probability,
     prepare_model_input,
     predict_with_venn_abers,
     unwrap_model,
 )
+
+
+PLOTLY_STATIC_CONFIG = {"displayModeBar": False}
 
 
 st.set_page_config(
@@ -253,6 +258,15 @@ AVERAGE_DEFAULT_NOTICE_FIELDS = {
     "Total_Fat",
 }
 
+FOOD_GROUP_COMPONENT_TOTALS = {
+    1: [2, 3, 4],
+    8: [9, 10],
+    11: [12, 13],
+    14: [15, 16],
+    19: [20, 21],
+    24: [25, 26, 27],
+}
+
 DIETARY_COMMON_FOODS = [
     {"food": "Pandesal", "serving": "1 piece", "group": "Bread/Merienda", "carbs_g": 16, "protein_g": 3, "fat_g": 1.5, "sugar_g": 2, "note": "Approximate per piece"},
     {"food": "Cooked white rice (kanin)", "serving": "1 cup", "group": "Staple/Starch", "carbs_g": 45, "protein_g": 4, "fat_g": 0.4, "sugar_g": 0.1, "note": "Approximate per cup"},
@@ -407,7 +421,7 @@ st.markdown(
             .landing-hero {
                 background: linear-gradient(145deg, #0f172a 0%, #7f1d1d 55%, #1e3a5f 100%);
                 color: #fff;
-                padding: 6.75rem 2rem 5.75rem;
+                padding: 2rem 2rem 5.75rem;
                 text-align: center;
                 position: relative;
                 overflow: hidden;
@@ -460,7 +474,7 @@ st.markdown(
             .feature-card .fc-desc { font-size: 0.83rem; color: #475569; line-height: 1.5; }
             .landing-disclaimer {
                 text-align: center; color: #94a3b8; font-size: 0.78rem;
-                margin-top: 1.6rem; padding-bottom: 1.4rem;
+                margin-top: 1.1rem; padding-bottom: 0.2rem;
             }
             /* ── App page ── */
             .glass-card {
@@ -485,12 +499,24 @@ st.markdown(
             .output-hero .oh-value { font-size: 2.1rem; font-weight: 800; margin-top: 0.1rem; }
             .output-hero .oh-sub { font-size: 0.87rem; color: rgba(255,255,255,0.70); margin-top: 0.15rem; }
             .risk-badge { display: inline-block; border-radius: 999px; padding: 0.32rem 1rem; font-size: 0.95rem; font-weight: 700; }
-            .risk-low    { background: #dcfce7; color: #15803d; }
-            .risk-medium { background: #fef9c3; color: #92400e; }
-            .risk-high   { background: #fee2e2; color: #b91c1c; }
+            .risk-low        { background: #dcfce7; color: #15803d; }
+            .risk-medium     { background: #fef9c3; color: #92400e; }
+            .risk-high       { background: #fee2e2; color: #b91c1c; }
+            .risk-at-risk    { background: #fee2e2; color: #b91c1c; }
+            .risk-not-at-risk{ background: #dcfce7; color: #15803d; }
             .kpi-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.18em; color: #64748b; }
             .kpi-value { font-size: 1.8rem; font-weight: 700; margin-top: 0.15rem; color: #0f172a; }
             .kpi-subtitle { color: #64748b; font-size: 0.92rem; margin-top: 0.18rem; }
+            @media (max-width: 768px) {
+                .output-hero {
+                    margin-bottom: 0.85rem;
+                }
+            }
+            /* Hide +/- step buttons on all number inputs (auto-computed dietary sums) */
+            button[data-testid="stNumberInputStepDown"],
+            button[data-testid="stNumberInputStepUp"] {
+                display: none !important;
+            }
             section[data-testid="stSidebar"] {
                 background: rgba(255,255,255,0.82);
                 border-right: 1px solid rgba(15,23,42,0.08);
@@ -615,6 +641,11 @@ def field_display_label(feature_name: str, dictionary_labels: dict[str, str]) ->
 
 
 MISSING_INPUT_CODES = {9.0, 99.0, 888888.0, 999999.0}
+CONDITIONALLY_ALLOWED_NA_CODES: dict[str, set[float]] = {
+    "con_alcohol": {999999.0},
+    "drnk_30days": {999999.0},
+    "binge_drink": {99.0},
+}
 
 
 def is_missing_input_value(value: Any) -> bool:
@@ -627,6 +658,19 @@ def is_missing_input_value(value: Any) -> bool:
     if np.isnan(numeric_value):
         return True
     return numeric_value in MISSING_INPUT_CODES
+
+
+def is_conditionally_allowed_na_value(feature_name: str, value: Any) -> bool:
+    allowed_codes = CONDITIONALLY_ALLOWED_NA_CODES.get(feature_name)
+    if not allowed_codes:
+        return False
+    try:
+        numeric_value = float(value)
+    except (TypeError, ValueError):
+        return False
+    if np.isnan(numeric_value):
+        return False
+    return numeric_value in allowed_codes
 
 
 def render_top_age_sex_fields(
@@ -667,7 +711,7 @@ def render_dietary_quick_guide_popup():
     with container:
         st.markdown("##### Common Food Samples (Web-informed)")
         st.caption("Compiled from public dietary guidance patterns (NHS Eatwell categories) and common household food portions.")
-        st.dataframe(pd.DataFrame(DIETARY_COMMON_FOODS), use_container_width=True, hide_index=True)
+        st.table(pd.DataFrame(DIETARY_COMMON_FOODS))
         st.markdown("##### FAQ")
         for question, answer in DIETARY_FAQ:
             st.markdown(f"- **{question}** {answer}")
@@ -695,18 +739,8 @@ def render_editable_numeric_input(
     default_text = _format_numeric_text(float(default_value), float(step))
     existing_text = str(st.session_state.get(widget_key, default_text)).strip()
 
-    average_label = label
-    if existing_text == "":
-        average_label = f"{label} (Filipino Average {label} Value)"
-    else:
-        try:
-            if np.isclose(float(existing_text), float(default_value)):
-                average_label = f"{label} (Filipino Average {label} Value)"
-        except ValueError:
-            pass
-
     text_value = st.text_input(
-        average_label,
+        label,
         value=existing_text if existing_text != "" else default_text,
         key=widget_key,
         help=help_text,
@@ -748,7 +782,7 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
             value=st.session_state.get("input_age_text", ""),
             key="input_age_text",
             help=help_text,
-            placeholder="Leave blank for missing",
+            placeholder="missing",
         )
         if age_text is None or not age_text.strip():
             return float("nan")
@@ -778,6 +812,21 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
         return float(default_value)
 
     if value_label_map and len(value_label_map) <= 30 and not force_numeric_input:
+        if feature_name == "ethnicity":
+            option_values_eth = _sorted_value_label_keys(value_label_map)
+            selected_eth = st.selectbox(
+                display_label,
+                options=option_values_eth,
+                index=option_values_eth.index("0") if "0" in option_values_eth else 0,
+                key=f"input_{feature_name}",
+                help=help_text,
+                format_func=lambda choice: f"{choice} - {value_label_map.get(choice, '')}".strip(" -"),
+            )
+            try:
+                return float(int(float(selected_eth)))
+            except ValueError:
+                return 0.0
+
         option_values: list[str | None] = [None] + _sorted_value_label_keys(value_label_map)
 
         def _format_choice(choice: str | None) -> str:
@@ -1039,42 +1088,42 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
             if feature == "weight":
                 values["weight"] = render_editable_numeric_input(
                     label="Weight",
-                    minimum=20.0,
+                    minimum=0.0,
                     maximum=300.0,
-                    default_value=68.0,
+                    default_value=0.0,
                     step=0.1,
                     widget_key="raw_weight",
-                    help_text=dictionary_labels.get("weight", "Average weight in kilograms."),
+                    help_text=dictionary_labels.get("weight", "Weight in kilograms."),
                 )
             elif feature == "height":
                 values["height"] = render_editable_numeric_input(
                     label="Height",
-                    minimum=0.8,
+                    minimum=0.0,
                     maximum=260.0,
-                    default_value=165.0,
+                    default_value=0.0,
                     step=0.1,
                     widget_key="raw_height",
-                    help_text=(dictionary_labels.get("height", "Average height.") + " Values >3 are treated as centimeters and converted to meters."),
+                    help_text=(dictionary_labels.get("height", "Height in cm or m.") + " Values >3 are treated as centimeters and converted to meters."),
                 )
             elif feature == "waist":
                 values["waist"] = render_editable_numeric_input(
                     label="Waist Circumference",
-                    minimum=30.0,
+                    minimum=0.0,
                     maximum=200.0,
-                    default_value=84.0,
+                    default_value=0.0,
                     step=0.1,
                     widget_key="raw_waist",
-                    help_text=dictionary_labels.get("waist", "Average waist circumference."),
+                    help_text=dictionary_labels.get("waist", "Waist circumference in cm."),
                 )
             elif feature == "hip":
                 values["hip"] = render_editable_numeric_input(
                     label="Hip Circumference",
-                    minimum=30.0,
+                    minimum=0.0,
                     maximum=200.0,
-                    default_value=96.0,
+                    default_value=0.0,
                     step=0.1,
                     widget_key="raw_hip",
-                    help_text=dictionary_labels.get("hip", "Average hip circumference."),
+                    help_text=dictionary_labels.get("hip", "Hip circumference in cm."),
                 )
 
     return values
@@ -1171,9 +1220,8 @@ def make_gauge_chart(score: float):
                 "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#94a3b8"},
                 "bar": {"color": "#dc2626"},
                 "steps": [
-                    {"range": [0, 33], "color": "#eef2ff"},
-                    {"range": [33, 67], "color": "#fee2e2"},
-                    {"range": [67, 100], "color": "#fecaca"},
+                    {"range": [0, 50], "color": "#dcfce7"},
+                    {"range": [50, 100], "color": "#fee2e2"},
                 ],
                 "threshold": {"line": {"color": "#111827", "width": 4}, "thickness": 0.75, "value": score * 100.0},
             },
@@ -1261,35 +1309,112 @@ def _try_compute_lime(model: Any, feature_names: list[str], input_frame: pd.Data
 
     try:
         background = _build_background_samples(feature_names, rows=120)
-        explainer = LimeTabularExplainer(
-            training_data=background.values,
-            feature_names=feature_names,
-            class_names=["No HTN", "HTN"],
-            mode="classification",
-            discretize_continuous=True,
-            random_state=42,
-        )
+        background = background.replace([np.inf, -np.inf], np.nan)
+        for name in feature_names:
+            background[name] = pd.to_numeric(background[name], errors="coerce").fillna(float(feature_default(name)))
 
         def _lime_predict(nd_array: np.ndarray) -> np.ndarray:
             frame = pd.DataFrame(nd_array, columns=feature_names)
+            frame = frame.replace([np.inf, -np.inf], np.nan)
+            for name in feature_names:
+                frame[name] = pd.to_numeric(frame[name], errors="coerce").fillna(float(feature_default(name)))
             return np.asarray(model.predict_proba(frame))
 
-        explanation = explainer.explain_instance(
-            data_row=input_frame.iloc[0].values,
-            predict_fn=_lime_predict,
-            num_features=min(12, len(feature_names)),
-            top_labels=1,
-        )
+        lime_attempts = [
+            {"discretize_continuous": True, "num_features": min(12, len(feature_names)), "num_samples": 3000},
+            {"discretize_continuous": False, "num_features": min(10, len(feature_names)), "num_samples": 2000},
+        ]
 
-        pairs = explanation.as_list(label=1)
-        lime_df = pd.DataFrame(pairs, columns=["rule", "weight"]) if pairs else pd.DataFrame(columns=["rule", "weight"])
-        return lime_df, None
+        last_error: Exception | None = None
+        for attempt in lime_attempts:
+            try:
+                explainer = LimeTabularExplainer(
+                    training_data=background.values,
+                    feature_names=feature_names,
+                    class_names=["No HTN", "HTN"],
+                    mode="classification",
+                    discretize_continuous=attempt["discretize_continuous"],
+                    random_state=42,
+                )
+
+                explanation = explainer.explain_instance(
+                    data_row=input_frame.iloc[0].values,
+                    predict_fn=_lime_predict,
+                    num_features=int(attempt["num_features"]),
+                    num_samples=int(attempt["num_samples"]),
+                    top_labels=1,
+                )
+
+                available_labels = sorted(getattr(explanation, "local_exp", {}).keys())
+                selected_label = 1 if 1 in available_labels else (available_labels[0] if available_labels else None)
+                if selected_label is None:
+                    pairs = []
+                else:
+                    pairs = explanation.as_list(label=int(selected_label))
+                lime_df = pd.DataFrame(pairs, columns=["rule", "weight"]) if pairs else pd.DataFrame(columns=["rule", "weight"])
+                return lime_df, None
+            except Exception as exc:
+                last_error = exc
+
+        return None, f"LIME computation failed: {last_error}"
     except Exception as exc:
         return None, f"LIME computation failed: {exc}"
 
 
+def _food_group_prefix_and_index(name: str) -> tuple[str, int] | None:
+    if name.startswith("epwt_fg"):
+        suffix = name[len("epwt_fg"):]
+        return ("epwt_fg", int(suffix)) if suffix.isdigit() else None
+    if name.startswith("fg"):
+        suffix = name[len("fg"):]
+        return ("fg", int(suffix)) if suffix.isdigit() else None
+    return None
+
+
+def _food_group_is_component_total(name: str) -> bool:
+    parsed = _food_group_prefix_and_index(name)
+    if parsed is None:
+        return False
+    _, idx = parsed
+    return idx in FOOD_GROUP_COMPONENT_TOTALS
+
+
+def _food_group_is_addend(name: str) -> bool:
+    parsed = _food_group_prefix_and_index(name)
+    if parsed is None:
+        return False
+    _, idx = parsed
+    addend_indices = {num for nums in FOOD_GROUP_COMPONENT_TOTALS.values() for num in nums}
+    return idx in addend_indices
+
+
+def _food_group_addend_names_for_total(total_name: str, available_names: set[str]) -> list[str]:
+    parsed = _food_group_prefix_and_index(total_name)
+    if parsed is None:
+        return []
+    prefix, total_idx = parsed
+    addend_indices = FOOD_GROUP_COMPONENT_TOTALS.get(total_idx, [])
+    return [f"{prefix}{idx}" for idx in addend_indices if f"{prefix}{idx}" in available_names]
+
+
 def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names: list[str]) -> dict[str, float]:
     values = dict(widget_values)
+    feature_name_set = set(feature_names)
+
+    # Enforce dictionary-defined subtotal fields from their component food-group inputs.
+    for name in feature_names:
+        if not _food_group_is_component_total(name):
+            continue
+        addends = _food_group_addend_names_for_total(name, feature_name_set)
+        if not addends:
+            continue
+        total_val = 0.0
+        for addend_name in addends:
+            raw = values.get(addend_name)
+            if raw is None or (isinstance(raw, float) and np.isnan(raw)):
+                continue
+            total_val += float(raw)
+        values[name] = float(total_val)
 
     food_group_names = [
         name
@@ -1298,6 +1423,9 @@ def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names:
     ]
     food_group_total = 0.0
     for name in food_group_names:
+        # Sum subtotal groups and standalone groups, but exclude addends already represented by subtotal groups.
+        if _food_group_is_addend(name):
+            continue
         raw = values.get(name)
         if raw is None or (isinstance(raw, float) and np.isnan(raw)):
             continue
@@ -1315,6 +1443,8 @@ def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names:
     protein_group_suffixes = {"7", "14", "15", "16", "17", "18", "19", "20", "21"}
     protein_source_total = 0.0
     for name in food_group_names:
+        if _food_group_is_addend(name):
+            continue
         suffix = ""
         if name.startswith("epwt_fg"):
             suffix = name.replace("epwt_fg", "")
@@ -1358,12 +1488,108 @@ def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names:
 
 
 def risk_label_from_score(probability: float) -> str:
-    pct = probability * 100.0
-    if pct <= 33.0:
-        return "Low Risk"
-    if pct <= 66.0:
-        return "Medium Risk"
-    return "High Risk"
+    if probability > 0.5:
+        return "At Risk of Hypertension"
+    return "Not at Risk"
+
+
+NON_ACTIONABLE_FEATURES = {"age", "sex", "ethnicity", "ethnicity_group"}
+
+
+def _compute_counterfactuals(
+    model: Any,
+    preprocessor: Any,
+    calibrator: Any,
+    raw_input_values: dict,
+    input_feature_names: list[str],
+    dictionary_labels: dict[str, str],
+    current_probability: float,
+    top_n: int = 8,
+) -> pd.DataFrame:
+    """Wachter-style counterfactuals: for each actionable feature independently,
+    find the value x' that minimises the Wachter objective
+
+        L(x') = λ·(f(x') - y_target)² + (x' - x)² / σ²
+
+    where y_target = 0.49 (just below the decision boundary), f is the model,
+    x is the current feature value, and σ is the feature's value range used
+    for normalisation. scipy.optimize.minimize_scalar is used to solve the
+    1-D problem for each feature within its valid range.
+    """
+    from scipy.optimize import minimize_scalar  # type: ignore
+
+    LAMBDA = 0.5   # trade-off: prediction loss vs. proximity to original
+    Y_TARGET = 0.49  # target probability – just below decision boundary
+
+    scan_features = [
+        fname for fname in input_feature_names
+        if fname in RANGE_HINTS
+        and fname not in NON_ACTIONABLE_FEATURES
+        and not fname.startswith("epwt_fg")
+        and not fname.startswith("fg")
+    ]
+
+    def _predict_for_value(fname: str, val: float) -> float:
+        test_inputs = dict(raw_input_values)
+        test_inputs[fname] = val
+        try:
+            frame = make_input_frame(input_feature_names, test_inputs)
+            model_frame = prepare_model_input(frame, preprocessor)
+            return predict_probability(model, model_frame)
+        except Exception:
+            return current_probability
+
+    rows = []
+    for fname in scan_features:
+        current_val = raw_input_values.get(fname)
+        if current_val is None or (isinstance(current_val, float) and np.isnan(current_val)):
+            continue
+        current_val = float(current_val)
+
+        minimum, maximum, _ = feature_range(fname)
+        feature_range_width = max(maximum - minimum, 1e-6)
+
+        def _wachter_loss(val: float) -> float:
+            prob = _predict_for_value(fname, val)
+            pred_loss = (prob - Y_TARGET) ** 2
+            proximity = ((val - current_val) / feature_range_width) ** 2
+            return LAMBDA * pred_loss + proximity
+
+        try:
+            opt = minimize_scalar(
+                _wachter_loss,
+                bounds=(minimum, maximum),
+                method="bounded",
+                options={"xatol": 1e-3, "maxiter": 200},
+            )
+            cf_val = float(np.clip(opt.x, minimum, maximum))
+        except Exception:
+            continue
+
+        cf_prob = _predict_for_value(fname, cf_val)
+        reduction = (current_probability - cf_prob) * 100.0
+
+        # Only report if the counterfactual actually reduces risk
+        if reduction <= 0.05 or np.isclose(cf_val, current_val, atol=1e-3):
+            continue
+
+        rows.append({
+            "Feature": dictionary_labels.get(fname, fname),
+            "Current Value": round(current_val, 2),
+            "Suggested Value": round(cf_val, 2),
+            "Current Risk": f"{current_probability * 100:.1f}%",
+            "Projected Risk": f"{cf_prob * 100:.1f}%",
+            "Risk Reduction": f"{reduction:.1f}%",
+            "_delta": reduction,
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values("_delta", ascending=False).drop(columns=["_delta"]).head(top_n).reset_index(drop=True)
+    return df
+
 
 
 if "show_form" not in st.session_state:
@@ -1405,18 +1631,47 @@ if not st.session_state.show_form:
           <div class="landing-badge">Philippine 2015 DOST-FNRI Thesis Model</div>
                     <h1>HRP-AI: A WEB APPLICATION FOR HYPERTENSION<br>RISK PREDICTION WITH CALIBRATED<br>EXPLAINABLE AI</h1>
           <p class="landing-sub" style="text-align:center;margin:0 auto;width:100%;">
-            A thesis-focused decision support interface for estimating hypertension risk using dietary, anthropometric, and clinical inputs, with calibrated probabilities and transparent explainability outputs.
+                        A thesis-focused decision support interface for estimating hypertension risk using dietary, anthropometric, and clinical inputs, with calibrated probabilities and transparent explainability outputs. The AI model was trained on the DOST-FNRI 2015 NNS dataset.
           </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    _, cta_col, _ = st.columns([2, 1.2, 2])
-    with cta_col:
-        if st.button("Begin Assessment", use_container_width=True, type="primary"):
-            st.session_state.show_form = True
-            st.rerun()
+    _, landing_cta_col, _ = st.columns([1.2, 2.6, 1.2])
+    with landing_cta_col:
+        st.markdown(
+                        """
+                        <div style="width:100%;margin:0.5rem 0 2.6rem;background:rgba(255,255,255,0.82);
+                                                border:1px solid rgba(24,33,47,0.09);border-radius:22px;
+                                                padding:1.6rem 2rem;box-shadow:0 8px 30px rgba(15,23,42,0.07);">
+                            <div style="text-align:center;font-size:0.74rem;text-transform:uppercase;
+                                                    letter-spacing:0.15em;color:#64748b;margin-bottom:1rem;">Model Performance</div>
+                            <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.2rem;">
+                                <div style="text-align:center;">
+                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">76.3%</div>
+                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Accuracy</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <div style="font-size:2rem;font-weight:800;color:#dc2626;">85.3%</div>
+                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Recall</div>
+                                </div>
+                            </div>
+                            <div style="font-size:0.83rem;color:#475569;line-height:1.65;text-align:justify;text-justify:inter-word;">
+                                <strong>Accuracy</strong> is the share of all individuals the model classifies correctly.
+                                <strong>Recall</strong> (sensitivity) is the share of true hypertensive cases the model catches —
+                                prioritised here because missing a true positive in health screening carries greater risk than a false alarm.
+                                Metrics are from the calibrated CatBoost (isotonic, threshold 0.35) evaluated on the held-out test set.
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+        )
+
+        _begin = st.button("Begin Assessment", use_container_width=True, type="primary")
+    if _begin:
+        st.session_state.show_form = True
+        st.rerun()
 
     st.markdown(
         """
@@ -1455,6 +1710,7 @@ else:
     # No st.form wrapper – inputs update live so dietary totals auto-compute on every re-render.
     submitted = False
     widget_values: dict[str, float] = {}
+    dietary_addend_fields: list[str] = []
     required_field_labels: dict[str, str] = {}
     rendered_feature_names: set[str] = set()
     engineered_names = {"BMI", "bmi", "whr", "alcohol_level", "smoking_level"}
@@ -1515,10 +1771,9 @@ else:
 
     if "Dietary pattern" in grouped_features:
         st.markdown("#### Dietary")
-        st.caption("Definitions for each dietary component are available in the field hover tooltips (?).")
-        render_dietary_quick_guide_popup()
+        st.caption("Enter each dietary value as your daily intake. Definitions for each dietary component are available in the field hover tooltips (?).")
         st.markdown("##### Example ordinary servings (approximate)")
-        st.caption("Use these examples as quick references before entering dietary values.")
+        st.caption("Use these examples as quick references before entering daily dietary values.")
         st.markdown(
             "- One cup cooked white rice ≈ 45 g carbohydrates (Total_CHO).\n"
             "- One egg ≈ 6 g protein and 5 g fat (Total_Prot, Total_Fat).\n"
@@ -1530,12 +1785,23 @@ else:
         if "vita" in feature_names and "vita" not in dietary_features:
             dietary_features.append("vita")
 
-        # Keep food-group fields first, then the remaining dietary fields (including vitamins).
+        def _food_group_position_key(name: str) -> float | None:
+            parsed = _food_group_prefix_and_index(name)
+            if parsed is None:
+                return None
+            _, idx = parsed
+            if idx in FOOD_GROUP_COMPONENT_TOTALS:
+                return float(max(FOOD_GROUP_COMPONENT_TOTALS[idx])) + 0.5
+            return float(idx)
+
+        # Match dictionary-style ordering, with subtotal fields moved after their component addends.
+        original_positions = {name: idx for idx, name in enumerate(dietary_features)}
         dietary_features = sorted(
             dietary_features,
             key=lambda name: (
-                0 if (name.startswith("fg") or name.startswith("epwt_fg")) else 1,
-                name,
+                0 if _food_group_position_key(name) is not None else 1,
+                _food_group_position_key(name) if _food_group_position_key(name) is not None else 10_000,
+                original_positions[name],
             ),
         )
 
@@ -1549,11 +1815,45 @@ else:
                 continue
             dietary_input_features.append(feature_name)
 
+        dietary_addend_fields = [
+            name
+            for name in dietary_input_features
+            if _food_group_prefix_and_index(name) is not None and not _food_group_is_component_total(name)
+        ]
+
         for start_index in range(0, len(dietary_input_features), 3):
             dietary_cols = st.columns(3)
             for offset, feature_name in enumerate(dietary_input_features[start_index:start_index + 3]):
                 with dietary_cols[offset]:
-                    widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
+                    if _food_group_is_component_total(feature_name):
+                        addend_names = _food_group_addend_names_for_total(feature_name, set(dietary_features))
+                        subtotal_value = 0.0
+                        for addend_name in addend_names:
+                            raw = widget_values.get(addend_name)
+                            if raw is None or (isinstance(raw, float) and np.isnan(raw)):
+                                continue
+                            subtotal_value += float(raw)
+
+                        minimum, maximum, step = feature_range(feature_name)
+                        display_label = field_display_label(feature_name, dictionary_labels)
+                        help_text = field_help_text(feature_name, dictionary_labels)
+                        auto_key = f"auto_{feature_name}"
+                        st.session_state[auto_key] = float(subtotal_value)
+                        st.number_input(
+                            display_label,
+                            min_value=float(minimum),
+                            max_value=float(maximum),
+                            value=float(subtotal_value),
+                            step=float(step),
+                            format="%.2f",
+                            key=auto_key,
+                            disabled=True,
+                            help=(help_text + " Auto-computed from the component food groups.") if help_text else "Auto-computed from the component food groups.",
+                        )
+                        st.caption("Auto-summed from the food-group inputs above.")
+                        widget_values[feature_name] = float(subtotal_value)
+                    else:
+                        widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
                     rendered_feature_names.add(feature_name)
                     required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
                     st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
@@ -1569,6 +1869,8 @@ else:
                 continue
             _is_fg = _fn.startswith("epwt_fg") or (_fn.startswith("fg") and not _fn.startswith("epwt_"))
             if _is_fg:
+                if _food_group_is_addend(_fn):
+                    continue
                 _live_food += float(_raw)
                 _sfx = _fn.replace("epwt_fg", "").replace("fg", "")
                 if _sfx in _protein_group_sfx:
@@ -1593,17 +1895,23 @@ else:
 
         _tot_a, _tot_b, _tot_c = st.columns(3)
         with _tot_a:
+            st.session_state["_disp_food"] = round(_live_food, 1)
             st.number_input("Total Food Intake (g)", value=round(_live_food, 1), disabled=True, key="_disp_food")
             st.caption("Auto-updates from the dietary values above.")
         with _tot_b:
+            st.session_state["_disp_energy"] = round(_live_energy, 1)
             st.number_input("Total Energy (kcal)", value=round(_live_energy, 1), disabled=True, key="_disp_energy")
             st.caption("Auto-updates from the dietary values above.")
         with _tot_c:
+            st.session_state["_disp_protein"] = round(_live_protein, 1)
             st.number_input("Total Protein (g)", value=round(_live_protein, 1), disabled=True, key="_disp_protein")
             st.caption("Auto-updates from the dietary values above.")
 
     missing_field_labels = [
-        label for feature_name, label in required_field_labels.items() if is_missing_input_value(widget_values.get(feature_name))
+        label
+        for feature_name, label in required_field_labels.items()
+        if is_missing_input_value(widget_values.get(feature_name))
+        and not is_conditionally_allowed_na_value(feature_name, widget_values.get(feature_name))
     ]
     if missing_field_labels:
         missing_preview = ", ".join(missing_field_labels[:8])
@@ -1615,10 +1923,22 @@ else:
         st.session_state.pop("_input_frame", None)
         st.session_state.pop("_model_feature_names", None)
 
+    dietary_all_zero = False
+    if dietary_addend_fields:
+        dietary_all_zero = all(
+            float(widget_values.get(name, 0.0) or 0.0) == 0.0 for name in dietary_addend_fields
+        )
+        if dietary_all_zero:
+            st.warning("Enter at least one non-zero food-group dietary intake value before predicting.")
+            st.session_state.scored = False
+            st.session_state.pop("_result", None)
+            st.session_state.pop("_input_frame", None)
+            st.session_state.pop("_model_feature_names", None)
+
     st.markdown("<br>", unsafe_allow_html=True)
     _, submit_col, _ = st.columns([1.3, 1.2, 1.3])
     with submit_col:
-        submitted = st.button("Predict My Risk", use_container_width=True, type="primary", disabled=bool(missing_field_labels))
+        submitted = st.button("Predict My Risk", use_container_width=True, type="primary", disabled=bool(missing_field_labels) or dietary_all_zero)
 
     components.html(
                 """
@@ -1681,7 +2001,7 @@ else:
                 height=0,
         )
 
-    if submitted and not missing_field_labels:
+    if submitted and not missing_field_labels and not dietary_all_zero:
         derived_widget_values = apply_dietary_derived_totals(widget_values, feature_names)
         input_values = build_input_values_from_widgets(feature_names, derived_widget_values)
         raw_input_frame = make_input_frame(feature_names, input_values)
@@ -1691,6 +2011,8 @@ else:
         st.session_state._result = result
         st.session_state._input_frame = model_input_frame
         st.session_state._model_feature_names = list(model_input_frame.columns)
+        st.session_state._raw_input_values = input_values
+        st.session_state._input_feature_names = feature_names
         st.session_state._scroll_to_output = True
 
     if st.session_state.scored and hasattr(st.session_state, "_result"):
@@ -1708,8 +2030,7 @@ else:
 
         score_pct = result.calibrated_probability * 100.0
         mapped_risk_label = risk_label_from_score(result.calibrated_probability)
-        tier_lower = mapped_risk_label.lower()
-        tier_css = "risk-low" if "low" in tier_lower else ("risk-medium" if "medium" in tier_lower else "risk-high")
+        tier_css = "risk-at-risk" if result.calibrated_probability > 0.5 else "risk-not-at-risk"
 
         kpi_a, kpi_b, kpi_c = st.columns(3)
         with kpi_a:
@@ -1724,14 +2045,14 @@ else:
             )
         with kpi_c:
             st.markdown(
-                f"<div class='output-hero'><div class='oh-label'>Risk Tier</div><div class='oh-value' style='font-size:1.4rem;'><span class='risk-badge {tier_css}'>{mapped_risk_label}</span></div><div class='oh-sub'>0-33% Low, 34-66% Medium, 67%+ High</div></div>",
+                f"<div class='output-hero'><div class='oh-label'>Risk Classification</div><div class='oh-value' style='font-size:1.15rem;'><span class='risk-badge {tier_css}'>{mapped_risk_label}</span></div><div class='oh-sub'>Based on calibrated probability</div></div>",
                 unsafe_allow_html=True,
             )
 
         chart_left, chart_right = st.columns([1, 1.5])
         with chart_left:
             st.markdown("**Risk Gauge**")
-            st.plotly_chart(make_gauge_chart(result.calibrated_probability), use_container_width=True)
+            st.plotly_chart(make_gauge_chart(result.calibrated_probability), use_container_width=True, config=PLOTLY_STATIC_CONFIG)
         with chart_right:
             st.markdown("**Prediction Summary**")
             summary_frame = pd.DataFrame(
@@ -1750,7 +2071,39 @@ else:
                     ],
                 }
             )
-            st.dataframe(summary_frame, use_container_width=True, hide_index=True)
+            st.table(summary_frame)
+
+        st.markdown(
+            "<div class='section-header' style='margin-top:1.8rem;'>"
+            "<h2>Counterfactual Analysis</h2>"
+            "<p>What single-feature changes would most reduce your hypertension risk score?</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        _raw_vals = st.session_state.get("_raw_input_values", {})
+        _input_fnames = st.session_state.get("_input_feature_names", [])
+        if _raw_vals and _input_fnames:
+            with st.spinner("Computing counterfactuals..."):
+                cf_df = _compute_counterfactuals(
+                    model=unwrap_model(model),
+                    preprocessor=preprocessor,
+                    calibrator=None,
+                    raw_input_values=_raw_vals,
+                    input_feature_names=_input_fnames,
+                    dictionary_labels=dictionary_labels,
+                    current_probability=result.calibrated_probability,
+                )
+            if cf_df.empty:
+                st.info("No single-feature change was found to reduce risk further.")
+            else:
+                st.caption(
+                    "Wachter-style counterfactuals: each row shows the optimal value for one actionable feature "
+                    "found by minimising a proximity-weighted loss that balances pushing the predicted probability "
+                    "below the decision boundary while staying as close as possible to the original input. "
+                    "All other features are held constant."
+                )
+                st.dataframe(cf_df, use_container_width=True, hide_index=True)
 
         st.markdown(
             "<div class='section-header' style='margin-top:1.8rem;'>"
@@ -1773,7 +2126,7 @@ else:
                 st.warning(shap_error)
             elif shap_local_df is not None and not shap_local_df.empty:
                 local_top = shap_local_df.head(12)
-                st.dataframe(local_top[["feature", "shap_value"]], use_container_width=True, hide_index=True)
+                st.table(local_top[["feature", "shap_value"]])
                 chart_df = local_top.head(10).iloc[::-1]
                 st.plotly_chart(
                     go.Figure(
@@ -1785,6 +2138,7 @@ else:
                         )
                     ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
                     use_container_width=True,
+                    config=PLOTLY_STATIC_CONFIG,
                 )
             else:
                 st.info("No SHAP local output produced.")
@@ -1795,7 +2149,7 @@ else:
                 st.warning(shap_error)
             elif shap_global_df is not None and not shap_global_df.empty:
                 global_top = shap_global_df.head(12)
-                st.dataframe(global_top, use_container_width=True, hide_index=True)
+                st.table(global_top)
                 chart_df = global_top.head(10)
                 st.plotly_chart(
                     go.Figure(
@@ -1817,6 +2171,7 @@ else:
                         showlegend=False,
                     ),
                     use_container_width=True,
+                    config=PLOTLY_STATIC_CONFIG,
                 )
             else:
                 st.info("No SHAP global output produced.")
@@ -1827,7 +2182,7 @@ else:
                 st.warning(lime_error)
             elif lime_df is not None and not lime_df.empty:
                 lime_top = lime_df.head(12)
-                st.dataframe(lime_top, use_container_width=True, hide_index=True)
+                st.table(lime_top)
                 chart_df = lime_top.head(10).iloc[::-1]
                 st.plotly_chart(
                     go.Figure(
@@ -1839,6 +2194,7 @@ else:
                         )
                     ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
                     use_container_width=True,
+                    config=PLOTLY_STATIC_CONFIG,
                 )
             else:
                 st.info("No LIME local output produced.")

@@ -11,6 +11,9 @@ from venn_abers import VennAbers
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+
+
 DEFAULT_MODEL_PATH = (
     PROJECT_ROOT
     / "gpu_rf_xgb_cat_exp2_artifacts"
@@ -18,9 +21,13 @@ DEFAULT_MODEL_PATH = (
     / "calibrated_top_models"
     / "top3_catboost_isotonic.joblib"
 )
-DEFAULT_CALIBRATOR_PATH = (
-    PROJECT_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib"
-)
+
+_calibrator_candidates = [
+    PROJECT_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib",
+    WORKSPACE_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib",
+]
+DEFAULT_CALIBRATOR_PATH = next((path for path in _calibrator_candidates if path.exists()), _calibrator_candidates[0])
+
 DEFAULT_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
 
 ONE_HOT_GROUPS = {
@@ -38,19 +45,19 @@ NUMERIC_DEFAULTS = {
     "hdl": 52.0,
     "ldl": 110.0,
     "ethnicity": 1.0,
-    "waist": 84.0,
-    "hip": 96.0,
-    "BMI": 24.0,
+    "waist": 0.0,
+    "hip": 0.0,
+    "BMI": 0.0,
     "Total_Food_epwt": 12.0,
     "Total_Ener": 1800.0,
     "Total_Prot": 70.0,
-    "Total_Calc": 900.0,
-    "Total_Iron": 12.0,
-    "Total_VitA": 600.0,
-    "Total_VitC": 70.0,
-    "Total_Thia": 1.0,
-    "Total_Ribo": 1.2,
-    "Total_Nia": 15.0,
+    "Total_Calc": 0.0,
+    "Total_Iron": 0.0,
+    "Total_VitA": 0.0,
+    "Total_VitC": 0.0,
+    "Total_Thia": 0.0,
+    "Total_Ribo": 0.0,
+    "Total_Nia": 0.0,
     "Total_CHO": 240.0,
     "Total_Fat": 65.0,
 }
@@ -240,6 +247,26 @@ def predict_with_venn_abers(
 ) -> PredictionResult:
     raw_probability = predict_probability(model, input_frame)
 
+    # Prefer explicit external Venn-Abers calibrator when supplied.
+    # This keeps uncertainty intervals available even if the wrapped model
+    # uses a point calibrator (e.g., isotonic/platt) internally.
+    if calibrator is not None:
+        probability_pair = make_probability_pair(raw_probability)
+        calibrated_pair, p0_p1 = calibrator.predict_proba(p_test=probability_pair)
+
+        calibrated_probability = float(calibrated_pair[0, 1])
+        lower_bound = float(np.clip(min(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
+        upper_bound = float(np.clip(max(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
+
+        return PredictionResult(
+            raw_probability=raw_probability,
+            calibrated_probability=calibrated_probability,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            uncertainty_width=max(0.0, upper_bound - lower_bound),
+            risk_label=score_to_label(calibrated_probability),
+        )
+
     if isinstance(model, dict):
         method = str(model.get("calibration_method", "base"))
         wrapped_calibrator = model.get("calibrator")
@@ -272,30 +299,13 @@ def predict_with_venn_abers(
             risk_label=score_to_label(calibrated_probability),
         )
 
-    if calibrator is None:
-        return PredictionResult(
-            raw_probability=raw_probability,
-            calibrated_probability=raw_probability,
-            lower_bound=raw_probability,
-            upper_bound=raw_probability,
-            uncertainty_width=0.0,
-            risk_label=score_to_label(raw_probability),
-        )
-
-    probability_pair = make_probability_pair(raw_probability)
-    calibrated_pair, p0_p1 = calibrator.predict_proba(p_test=probability_pair)
-
-    calibrated_probability = float(calibrated_pair[0, 1])
-    lower_bound = float(np.clip(min(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
-    upper_bound = float(np.clip(max(p0_p1[0, 0], p0_p1[0, 1], calibrated_probability), 0.0, 1.0))
-
     return PredictionResult(
         raw_probability=raw_probability,
-        calibrated_probability=calibrated_probability,
-        lower_bound=lower_bound,
-        upper_bound=upper_bound,
-        uncertainty_width=max(0.0, upper_bound - lower_bound),
-        risk_label=score_to_label(calibrated_probability),
+        calibrated_probability=raw_probability,
+        lower_bound=raw_probability,
+        upper_bound=raw_probability,
+        uncertainty_width=0.0,
+        risk_label=score_to_label(raw_probability),
     )
 
 
