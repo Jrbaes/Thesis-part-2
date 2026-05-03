@@ -306,7 +306,7 @@ def feature_default(feature_name: str) -> float:
 def feature_range(feature_name: str) -> tuple[float, float, float]:
     if feature_name in RANGE_HINTS:
         return RANGE_HINTS[feature_name]
-    if feature_name.startswith("epwt_fg"):
+    if feature_name.startswith("epwt_fg") or feature_name.startswith("fg"):
         return (0.0, 500.0, 1.0)  # safe fallback for unmapped food groups
     if feature_name.startswith("Total_"):
         return (0.0, 5000.0, 1.0)
@@ -335,7 +335,7 @@ def group_feature_names(feature_names: list[str]) -> dict[str, list[str]]:
             grouped["Core clinical"].append(feature_name)
         elif feature_name in {"waist", "hip", "BMI"}:
             grouped["Anthropometrics"].append(feature_name)
-        elif feature_name.startswith("epwt_fg") or feature_name.startswith("Total_"):
+        elif feature_name.startswith("epwt_fg") or feature_name.startswith("fg") or feature_name.startswith("Total_"):
             grouped["Dietary pattern"].append(feature_name)
         else:
             grouped["Other model inputs"].append(feature_name)

@@ -1,0 +1,8 @@
+model_key,model_family,compute_type,balancing_method,selected_threshold,selected_for_calibration
+cpu_adaboost,adaboost,cpu,none,0.4,True
+cpu_knn,knn,cpu,none,0.35,True
+cpu_logistic_regression,logistic_regression,cpu,class_weight=balanced,0.35,True
+cpu_naive_bayes,naive_bayes,cpu,none,0.35,True
+catboost,catboost,gpu_or_gpu_first,none,0.35,True
+random_forest,random_forest,gpu_or_gpu_first,class_weight=balanced_subsample,0.4,True
+xgboost,xgboost,gpu_or_gpu_first,none,0.35,True

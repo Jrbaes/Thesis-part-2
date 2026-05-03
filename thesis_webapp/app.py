@@ -673,6 +673,63 @@ def render_dietary_quick_guide_popup():
             st.markdown(f"- **{question}** {answer}")
 
 
+def _format_numeric_text(value: float, step: float) -> str:
+    if not np.isfinite(float(value)):
+        return ""
+    step_text = format(float(step), "f").rstrip("0").rstrip(".")
+    decimals = 0
+    if "." in step_text:
+        decimals = len(step_text.split(".", 1)[1])
+    return f"{float(value):.{decimals}f}" if decimals else str(int(round(float(value))))
+
+
+def render_editable_numeric_input(
+    label: str,
+    minimum: float,
+    maximum: float,
+    default_value: float,
+    step: float,
+    widget_key: str,
+    help_text: str | None,
+):
+    default_text = _format_numeric_text(float(default_value), float(step))
+    existing_text = str(st.session_state.get(widget_key, default_text)).strip()
+
+    average_label = label
+    if existing_text == "":
+        average_label = f"{label} (Filipino Average {label} Value)"
+    else:
+        try:
+            if np.isclose(float(existing_text), float(default_value)):
+                average_label = f"{label} (Filipino Average {label} Value)"
+        except ValueError:
+            pass
+
+    text_value = st.text_input(
+        average_label,
+        value=existing_text if existing_text != "" else default_text,
+        key=widget_key,
+        help=help_text,
+        placeholder=default_text,
+    )
+
+    cleaned_text = text_value.strip()
+    if cleaned_text == "":
+        return float(default_value)
+
+    try:
+        numeric_value = float(cleaned_text)
+    except ValueError:
+        st.warning(f"Please enter a valid numeric value for {label}.")
+        return float("nan")
+
+    if numeric_value < float(minimum) or numeric_value > float(maximum):
+        st.warning(f"{label} must be between {minimum:g} and {maximum:g}.")
+        return float("nan")
+
+    return float(numeric_value)
+
+
 def render_number_input(feature_name: str, dictionary_labels: dict[str, str], dictionary_value_labels: dict[str, dict[str, str]]):
     minimum, maximum, step = feature_range(feature_name)
     default_value = feature_default(feature_name)
@@ -743,20 +800,14 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
         except ValueError:
             return float("nan")
 
-    numeric_value = st.number_input(
-        (
-            f"{display_label} (Filipino Average {display_label} Value)"
-            if np.isfinite(float(default_value))
-            and np.isclose(float(st.session_state.get(widget_key, default_value)), float(default_value))
-            else display_label
-        ),
-        min_value=float(minimum),
-        max_value=float(maximum),
-        value=float(default_value),
+    numeric_value = render_editable_numeric_input(
+        label=display_label,
+        minimum=float(minimum),
+        maximum=float(maximum),
+        default_value=float(default_value),
         step=float(step),
-        format="%.2f",
-        key=widget_key,
-        help=help_text,
+        widget_key=widget_key,
+        help_text=help_text,
     )
 
     return float(numeric_value)
@@ -764,11 +815,24 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
 
 def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_value_labels: dict[str, dict[str, str]]):
 
-    def _optional_code(variable_name: str, options: list[int], key: str, fallback_help: str):
+    def _optional_code(
+        variable_name: str,
+        options: list[int],
+        key: str,
+        fallback_help: str,
+        *,
+        auto_value: int | None = None,
+        disabled: bool = False,
+    ):
         value_label_map = VALUE_LABEL_OVERRIDES.get(variable_name, dictionary_value_labels.get(variable_name, {}))
         variable_help = dictionary_labels.get(variable_name, fallback_help)
 
         option_values: list[int | None] = [None] + options
+
+        if auto_value is not None:
+            st.session_state[key] = auto_value
+        elif key not in st.session_state or st.session_state[key] not in option_values:
+            st.session_state[key] = None
 
         def _format_choice(choice: int | None) -> str:
             if choice is None:
@@ -783,12 +847,16 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
         selected = st.selectbox(
             field_display_label(variable_name, dictionary_labels),
             options=option_values,
-            index=0,
+            index=option_values.index(st.session_state.get(key)),
             key=key,
             format_func=_format_choice,
             help=variable_help,
+            disabled=disabled,
         )
         return float("nan") if selected is None else float(int(selected))
+
+    def _is_code(value: float, target: int) -> bool:
+        return not (value is None or (isinstance(value, float) and np.isnan(value))) and int(value) == target
 
     smoke_left, smoke_mid, smoke_right = st.columns(3)
     with smoke_left:
@@ -798,19 +866,57 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
             key="raw_smoke_status",
             fallback_help="Smoking status code.",
         )
+
+    smoke_current_options = [0, 1, 2, 3, 888888]
+    smoke_history_options = [0, 1, 2, 3, 4, 5, 888888]
+    smoke_current_auto: int | None = None
+    smoke_history_auto: int | None = None
+    smoke_current_disabled = False
+    smoke_history_disabled = False
+
+    if _is_code(smoke_status, 0):
+        smoke_current_auto = 0
+        smoke_history_auto = 0
+        smoke_current_disabled = True
+        smoke_history_disabled = True
+    elif _is_code(smoke_status, 1):
+        smoke_current_options = [1, 2, 3]
+        smoke_history_auto = 888888
+        smoke_history_disabled = True
+    elif _is_code(smoke_status, 2):
+        smoke_current_auto = 0
+        smoke_history_options = [1, 2, 3, 4, 5]
+        smoke_current_disabled = True
+        smoke_history_disabled = False
+
     with smoke_mid:
         current_smoking = _optional_code(
             variable_name="current_smoking",
-            options=[0, 1, 2, 3, 888888],
+            options=smoke_current_options,
             key="raw_current_smoking",
             fallback_help="Current smoking code used by the engineering logic.",
+            auto_value=smoke_current_auto,
+            disabled=smoke_current_disabled,
         )
+
+    if smoke_history_auto is None and not smoke_history_disabled and _is_code(current_smoking, 1):
+        smoke_history_auto = 1
+        smoke_history_disabled = True
+    if smoke_history_auto is None and not smoke_history_disabled and _is_code(current_smoking, 2):
+        smoke_history_auto = 2
+        smoke_history_disabled = True
+    if smoke_history_auto is None and not smoke_history_disabled and _is_code(current_smoking, 3):
+        smoke_history_auto = 3
+        smoke_history_disabled = True
+
     with smoke_right:
         ever_smk = _optional_code(
             variable_name="ever_smk",
-            options=[0, 1, 2, 3, 4, 5, 888888],
+            options=smoke_history_options,
             key="raw_ever_smk",
             fallback_help="Ever-smoking history code.",
+            auto_value=smoke_history_auto,
+            disabled=smoke_history_disabled,
         )
 
     alc_left, alc_mid, alc_right = st.columns(3)
@@ -821,35 +927,89 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
             key="raw_alcohol_status",
             fallback_help="Alcohol status code.",
         )
+
+    alcohol_options = [0, 1, 2, 888888]
+    con_alcohol_options = [0, 1, 999999]
+    drnk_30days_options = [0, 1, 999999]
+    alcohol_auto: int | None = None
+    con_alcohol_auto: int | None = None
+    drnk_30days_auto: int | None = None
+    binge_auto: int | None = None
+    alcohol_disabled = False
+    con_alcohol_disabled = False
+    drnk_30days_disabled = False
+    binge_disabled = False
+
+    if _is_code(alcohol_status, 0):
+        alcohol_auto = 0
+        con_alcohol_auto = 999999
+        drnk_30days_auto = 999999
+        binge_auto = 99
+        alcohol_disabled = True
+        con_alcohol_disabled = True
+        drnk_30days_disabled = True
+        binge_disabled = True
+    elif _is_code(alcohol_status, 1):
+        alcohol_auto = 1
+        con_alcohol_auto = 1
+        drnk_30days_options = [0, 1]
+        alcohol_disabled = True
+        con_alcohol_disabled = True
+    elif _is_code(alcohol_status, 2):
+        alcohol_auto = 1
+        con_alcohol_auto = 0
+        drnk_30days_auto = 999999
+        binge_auto = 99
+        alcohol_disabled = True
+        con_alcohol_disabled = True
+        drnk_30days_disabled = True
+        binge_disabled = True
+
     with alc_mid:
         alcohol = _optional_code(
             variable_name="alcohol",
-            options=[0, 1, 2, 888888],
+            options=alcohol_options,
             key="raw_alcohol",
             fallback_help="Ever alcohol-use code used in fallback logic.",
+            auto_value=alcohol_auto,
+            disabled=alcohol_disabled,
         )
     with alc_right:
         con_alcohol = _optional_code(
             variable_name="con_alcohol",
-            options=[0, 1, 999999],
+            options=con_alcohol_options,
             key="raw_con_alcohol",
             fallback_help="Current alcohol indicator for fallback logic.",
+            auto_value=con_alcohol_auto,
+            disabled=con_alcohol_disabled,
         )
 
     binge_left, binge_mid, _ = st.columns(3)
     with binge_left:
         drnk_30days = _optional_code(
             variable_name="drnk_30days",
-            options=[0, 1, 999999],
+            options=drnk_30days_options,
             key="raw_drnk_30days",
             fallback_help="Drank an alcoholic drink within the past 30 days.",
+            auto_value=drnk_30days_auto,
+            disabled=drnk_30days_disabled,
         )
+
+    if not binge_disabled and _is_code(drnk_30days, 0):
+        binge_auto = 0
+        binge_disabled = True
+    elif not binge_disabled and _is_code(drnk_30days, 999999):
+        binge_auto = 99
+        binge_disabled = True
+
     with binge_mid:
         binge_drink = _optional_code(
             variable_name="binge_drink",
             options=[0, 1, 99],
             key="raw_binge_drink",
             fallback_help="Binge-drink indicator used to set highest engineered level.",
+            auto_value=binge_auto,
+            disabled=binge_disabled,
         )
 
 
@@ -877,44 +1037,44 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
     for index, feature in enumerate(missing_raw):
         with cols[index % 3]:
             if feature == "weight":
-                values["weight"] = st.number_input(
-                    "Weight (Filipino Average Weight Value)" if np.isclose(float(st.session_state.get("raw_weight", 68.0)), 68.0) else "Weight",
-                    min_value=20.0,
-                    max_value=300.0,
-                    value=68.0,
+                values["weight"] = render_editable_numeric_input(
+                    label="Weight",
+                    minimum=20.0,
+                    maximum=300.0,
+                    default_value=68.0,
                     step=0.1,
-                    key="raw_weight",
-                    help=dictionary_labels.get("weight", "Average weight in kilograms."),
+                    widget_key="raw_weight",
+                    help_text=dictionary_labels.get("weight", "Average weight in kilograms."),
                 )
             elif feature == "height":
-                values["height"] = st.number_input(
-                    "Height (Filipino Average Height Value)" if np.isclose(float(st.session_state.get("raw_height", 165.0)), 165.0) else "Height",
-                    min_value=0.8,
-                    max_value=260.0,
-                    value=165.0,
+                values["height"] = render_editable_numeric_input(
+                    label="Height",
+                    minimum=0.8,
+                    maximum=260.0,
+                    default_value=165.0,
                     step=0.1,
-                    key="raw_height",
-                    help=(dictionary_labels.get("height", "Average height.") + " Values >3 are treated as centimeters and converted to meters."),
+                    widget_key="raw_height",
+                    help_text=(dictionary_labels.get("height", "Average height.") + " Values >3 are treated as centimeters and converted to meters."),
                 )
             elif feature == "waist":
-                values["waist"] = st.number_input(
-                    "Waist Circumference (Filipino Average Waist Circumference Value)" if np.isclose(float(st.session_state.get("raw_waist", 84.0)), 84.0) else "Waist Circumference",
-                    min_value=30.0,
-                    max_value=200.0,
-                    value=84.0,
+                values["waist"] = render_editable_numeric_input(
+                    label="Waist Circumference",
+                    minimum=30.0,
+                    maximum=200.0,
+                    default_value=84.0,
                     step=0.1,
-                    key="raw_waist",
-                    help=dictionary_labels.get("waist", "Average waist circumference."),
+                    widget_key="raw_waist",
+                    help_text=dictionary_labels.get("waist", "Average waist circumference."),
                 )
             elif feature == "hip":
-                values["hip"] = st.number_input(
-                    "Hip Circumference (Filipino Average Hip Circumference Value)" if np.isclose(float(st.session_state.get("raw_hip", 96.0)), 96.0) else "Hip Circumference",
-                    min_value=30.0,
-                    max_value=200.0,
-                    value=96.0,
+                values["hip"] = render_editable_numeric_input(
+                    label="Hip Circumference",
+                    minimum=30.0,
+                    maximum=200.0,
+                    default_value=96.0,
                     step=0.1,
-                    key="raw_hip",
-                    help=dictionary_labels.get("hip", "Average hip circumference."),
+                    widget_key="raw_hip",
+                    help_text=dictionary_labels.get("hip", "Average hip circumference."),
                 )
 
     return values
@@ -1368,25 +1528,36 @@ else:
         )
         dietary_features = list(grouped_features["Dietary pattern"])
         if "vita" in feature_names and "vita" not in dietary_features:
-            dietary_features.insert(0, "vita")
+            dietary_features.append("vita")
 
-        dietary_cols = st.columns(3)
-        _diet_col_idx = 0
+        # Keep food-group fields first, then the remaining dietary fields (including vitamins).
+        dietary_features = sorted(
+            dietary_features,
+            key=lambda name: (
+                0 if (name.startswith("fg") or name.startswith("epwt_fg")) else 1,
+                name,
+            ),
+        )
+
+        dietary_input_features: list[str] = []
         for feature_name in dietary_features:
             if feature_name in rendered_feature_names:
                 continue
-            # Skip auto-computed totals from input – show as live metrics below
             if feature_name in AUTO_COMPUTED_TOTAL_FIELDS:
                 widget_values[feature_name] = float(feature_default(feature_name))
                 rendered_feature_names.add(feature_name)
                 continue
-            with dietary_cols[_diet_col_idx % 3]:
-                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
-                rendered_feature_names.add(feature_name)
-                required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
-            _diet_col_idx += 1
+            dietary_input_features.append(feature_name)
 
-        # ── Live-computed dietary totals (auto-updates with every input change) ──
+        for start_index in range(0, len(dietary_input_features), 3):
+            dietary_cols = st.columns(3)
+            for offset, feature_name in enumerate(dietary_input_features[start_index:start_index + 3]):
+                with dietary_cols[offset]:
+                    widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
+                    rendered_feature_names.add(feature_name)
+                    required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
+                    st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
+
         _protein_group_sfx = {"7", "14", "15", "16", "17", "18", "19", "20", "21"}
         _live_food = 0.0
         _live_protein_src = 0.0
@@ -1420,18 +1591,16 @@ else:
             if _alias in feature_names:
                 widget_values[_alias] = _live_protein
 
-        st.divider()
-        st.markdown("##### Computed Dietary Totals (updates as you fill in values above)")
         _tot_a, _tot_b, _tot_c = st.columns(3)
         with _tot_a:
             st.number_input("Total Food Intake (g)", value=round(_live_food, 1), disabled=True, key="_disp_food")
-            st.caption("Sum of all food-group inputs above")
+            st.caption("Auto-updates from the dietary values above.")
         with _tot_b:
             st.number_input("Total Energy (kcal)", value=round(_live_energy, 1), disabled=True, key="_disp_energy")
-            st.caption("4 × carbs + 4 × protein + 9 × fat (estimated)")
+            st.caption("Auto-updates from the dietary values above.")
         with _tot_c:
             st.number_input("Total Protein (g)", value=round(_live_protein, 1), disabled=True, key="_disp_protein")
-            st.caption("Estimated from protein-heavy food groups")
+            st.caption("Auto-updates from the dietary values above.")
 
     missing_field_labels = [
         label for feature_name, label in required_field_labels.items() if is_missing_input_value(widget_values.get(feature_name))
@@ -1464,12 +1633,31 @@ else:
                     const submitBtn = submitButtons[submitButtons.length - 1];
                     const formContainer = doc;
                     const selector = 'input:not([type="hidden"]):not([disabled]), textarea';
+                    const numericPlaceholderPattern = /^-?\\d+(?:\\.\\d+)?$/;
 
                     function visibleFields() {
                         return Array.from(formContainer.querySelectorAll(selector)).filter((el) => el.offsetParent !== null);
                     }
 
+                    function bindClearOnFocus(el) {
+                        if (el.dataset.clearOnFocusBound === '1') return;
+                        if (el.tagName !== 'INPUT' || el.type !== 'text') return;
+                        const placeholder = (el.getAttribute('placeholder') || '').trim();
+                        if (!numericPlaceholderPattern.test(placeholder)) return;
+                        el.dataset.clearOnFocusBound = '1';
+                        el.addEventListener('focus', function() {
+                            el.value = '';
+                        });
+                        el.addEventListener('blur', function() {
+                            if (el.value.trim() !== '') return;
+                            el.value = placeholder;
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        });
+                    }
+
                     visibleFields().forEach((el) => {
+                        bindClearOnFocus(el);
                         if (el.dataset.enterNavBound === '1') return;
                         el.dataset.enterNavBound = '1';
                         el.addEventListener('keydown', function(e) {
