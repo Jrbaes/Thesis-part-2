@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +14,6 @@ from backend import (
     DEFAULT_CALIBRATOR_PATH,
     DEFAULT_MODEL_PATH,
     DEFAULT_PREPROCESSOR_PATH,
-    RANGE_HINTS,
     build_input_values_from_widgets,
     feature_default,
     feature_range,
@@ -26,505 +24,37 @@ from backend import (
     load_model,
     load_preprocessor,
     make_input_frame,
-    predict_probability,
     prepare_model_input,
     predict_with_venn_abers,
     unwrap_model,
 )
+from app_constants import (
+    AUTO_COMPUTED_TOTAL_FIELDS,
+    CONDITIONALLY_ALLOWED_NA_CODES,
+    DISPLAY_LABEL_OVERRIDES,
+    FEATURE_DICTIONARY_ALIASES,
+    FOOD_GROUP_COMPONENT_TOTALS,
+    MISSING_INPUT_CODES,
+    NO_HELP_FEATURES,
+    VALUE_LABEL_OVERRIDES,
+    VARIABLE_DEFINITION_OVERRIDES,
+    get_dictionary_paths,
+)
+from counterfactuals import compute_counterfactuals
+from explainability import try_compute_lime, try_compute_shap
+from styles import apply_global_styles
 
 
 PLOTLY_STATIC_CONFIG = {"displayModeBar": False}
 
 
-st.set_page_config(
-    page_title="Hypertension Risk Assesment",
-    page_icon="",
-    layout="wide",
-        initial_sidebar_state="collapsed",
-)
+st.set_page_config(page_title="Hypertension Risk Assesment", page_icon="", layout="wide", initial_sidebar_state="collapsed")
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DICTIONARY_PATHS = get_dictionary_paths(PROJECT_ROOT)
 
-DICTIONARY_PATHS = [
-    PROJECT_ROOT / "Datasets2015" / "Clinical" / "Jonathan Ralph_Baes_2026-03-26141903_data-dictionary_clinical.csv",
-    PROJECT_ROOT / "Datasets2015" / "Dietary" / "Jonathan Ralph_Baes_2026-03-26141801_data-dictionary_dietary.csv",
-    PROJECT_ROOT / "Datasets2015" / "Anthropometric" / "Jonathan Ralph_Baes_2026-03-26141834_data-dictionary_anthrop.csv",
-]
-
-FEATURE_DICTIONARY_ALIASES = {
-    "Total_Ener": ["Total_Energy"],
-    "Total_Prot": ["Total_Protein"],
-    "Total_Calc": ["Total_Calcium"],
-    "Total_VitA": ["Total_VitaminA"],
-    "Total_VitC": ["Total_VitaminC"],
-    "Total_Thia": ["Total_Thiamin"],
-    "Total_Ribo": ["Total_Riboflavin"],
-    "Total_Nia": ["Total_Niacin"],
-    "Total_Food_epwt": ["Total_FoodIntake"],
-}
-
-VARIABLE_DEFINITION_OVERRIDES = {
-    "hhnum": "Household Number (unique identifier; merging variable): unique code assigned to each sample household. Shared by members of the same household and used with region/province codes for merging components.",
-    "member_code": "Member Code (unique identifier; merging variable): pre-coded household membership number.",
-    "age": "Age of Respondent: exact age as of last birthday.",
-    "sex": "Sex of Respondent: sex of household member.",
-    "psc": "Physiological Status Code: current physiological status among female members (pregnancy/lactation categories; 99 indicates male member).",
-    "csc": "Civil Status Code: civil status of the household member.",
-    "Ave_SBP": "Average Systolic BP (mmHg): pressure during heart contraction phase (for 10 years old and above).",
-    "Ave_DBP": "Average Diastolic BP (mmHg): pressure during heart relaxation phase between beats (for 10 years old and above).",
-    "pa_met": "Physical activity (MET-based indicator): higher values indicate greater activity energy expenditure.",
-    "fbs": "Fasting Blood Sugar (mg/dL): blood glucose after fasting.",
-    "chol": "Total Cholesterol (mg/dL): blood cholesterol concentration.",
-    "tri": "Triglycerides (mg/dL): blood triglyceride concentration.",
-    "hdl": "High-Density Lipoprotein (mg/dL): often referred to as protective cholesterol.",
-    "ldl": "Low-Density Lipoprotein (mg/dL): often referred to as atherogenic cholesterol.",
-    "ethnicity": "Ethnicity code: 0 Not IP/without foreign blood, 1 Indigenous People, 2 2/3 Filipino, 3 with 1/2 foreign blood.",
-    "current_smoking": "Presently smoke cigarettes/cigars/pipes/tobacco products: current smoking frequency code.",
-    "ever_smk": "Ever smoked in the past: former smoking behavior code.",
-    "alcohol": "Ever consumed alcoholic drink such as beer, wine, or spirits.",
-    "con_alcohol": "Consumed alcoholic drink within the past 12 months (current drinkers).",
-    "drnk_30days": "Consumed alcoholic drink within the past 30 days.",
-    "drnk_30d_num": "Total number of standard drinks in one single occasion in the past 30 days.",
-    "smoke_status": "Smoking Status (Generated): 0 Never, 1 Current, 2 Former, 9 Not Applicable.",
-    "alcohol_status": "Alcohol Status (Generated): 0 Never, 1 Current, 2 Former, 9 Not Applicable.",
-    "binge_drink": "Binge Drinking Status (Generated): female >=4 standard drinks in a row; male >=5, among those who drank in past 30 days.",
-    "weight": "Ave Weight (kg): body heaviness from muscle, fat, bone, organs and related conditions.",
-    "height": "Ave Height (cm): standing height (or recumbent length for very young children in source survey).",
-    "waist": "Ave Waist Circumference (cm): perimeter around natural waist/abdomen.",
-    "hip": "Ave Hip Circumference (cm): distance around largest hip/buttocks area.",
-    "measure_remarks": "Remarks in Measure: subjective notes to validate unusual measurement values.",
-    "anthro_group": "Anthrop Group: classification by age and physiological status.",
-    "mos_lactation": "Months of Lactation: duration of lactation in months.",
-    "mos_preg": "Months of Pregnancy: pregnancy period in months.",
-    "fg1": "Cereals and Cereal Products (g): includes rice/corn/other cereals.",
-    "fg2": "Rice and Rice Products (g): rice and rice-based products.",
-    "fg3": "Corn and Corn Products (g): corn and corn-based products.",
-    "fg4": "Other Cereal Products (g): breads, biscuits, cakes, noodles, flour, etc.",
-    "fg5": "Starchy Roots and Tubers (g): sweet potato, potato, cassava, and similar roots/tubers.",
-    "fg6": "Sugar and Syrups (g): sugars, syrups, sweets, sweetened drinks and sugary foods.",
-    "fg7": "Dried Beans, Nuts and Seeds (g): legumes, nuts, seeds and related products.",
-    "fg8": "Vegetables (g): aggregate of green/yellow and other vegetables.",
-    "fg9": "Green Leafy and Yellow Vegetables (g).",
-    "fg10": "Other Vegetables (g).",
-    "fg11": "Fruits (g): includes vitamin C-rich and other fruits.",
-    "fg12": "Vitamin C-Rich Fruits (g).",
-    "fg13": "Other Fruits (g).",
-    "fg14": "Fish, Meat and Poultry (g).",
-    "fg15": "Fish and Fish Products (g): fresh/dried/processed fish plus crustaceans/mollusks.",
-    "fg16": "Meat and Meat Products (g): fresh, organ, and processed meats.",
-    "fg17": "Poultry (g).",
-    "fg18": "Eggs (g).",
-    "fg19": "Milk and Milk Products (g).",
-    "fg20": "Whole Milk (g): fresh/evaporated/recombined/powdered/condensed milk.",
-    "fg21": "Milk Products (g): cheese, yogurt, cultured milk, ice cream, etc.",
-    "fg23": "Fats and Oils (g): cooking oil, coconut fat, lard, butter, margarine, etc.",
-    "fg24": "Miscellaneous (g): beverages, condiments/spices, and other misc.",
-    "fg25": "Beverages (g): coffee, tea, alcoholic beverages, cacao/chocolate drinks, flavored drinks.",
-    "fg26": "Condiments and Spices (g): salt, vinegar, catsup, and seasonings.",
-    "fg27": "Other Miscellaneous (g): herbs and other miscellaneous ingredients.",
-    "Total_FoodIntake": "Total Food Intake (g): total household intake across 27 food groups.",
-    "Total_Energy": "Total Energy (kcal): total household energy intake.",
-    "Total_Protein": "Total Protein (g): total household protein intake.",
-    "Total_Calcium": "Total Calcium (mg): total household calcium intake.",
-    "Total_Iron": "Total Iron (mg): total household iron intake.",
-    "Total_VitaminA": "Total Vitamin A (mcg RE): total household vitamin A intake.",
-    "Total_Thiamin": "Total Thiamin (mg): total household thiamin intake.",
-    "Total_Riboflavin": "Total Riboflavin (mg): total household riboflavin intake.",
-    "Total_Niacin": "Total Niacin (mg): total household niacin intake.",
-    "Total_VitaminC": "Total Vitamin C (mg): total household vitamin C intake.",
-    "Total_CHO": "Total Carbohydrates (g): total household carbohydrate intake.",
-    "Total_Fat": "Total Fats (g): total household fat intake.",
-}
-
-VALUE_LABEL_OVERRIDES = {
-    "sex": {"1": "Male", "2": "Female"},
-    "ethnicity": {
-        "0": "No, Not an IP/Without Foreign Blood (default)",
-        "1": "Yes, Indigenous People",
-        "2": "Yes, 2/3 Filipino",
-        "3": "Yes, with 1/2 Foreign Blood",
-    },
-    "current_smoking": {
-        "0": "No, not at all",
-        "1": "Yes, once a week",
-        "2": "Yes, 2-6 times a week",
-        "3": "Yes, every day, 7 times a week",
-        "888888": "Not Applicable",
-    },
-    "ever_smk": {
-        "0": "No, not at all",
-        "1": "Yes, once a week",
-        "2": "Yes, 2-6 times a week",
-        "3": "Yes, every day",
-        "4": "Yes, tried once",
-        "5": "Yes, occasionally",
-        "888888": "Not Applicable",
-    },
-    "alcohol": {
-        "0": "No",
-        "1": "Yes",
-        "2": "Yes, occasionally, during socials",
-        "888888": "Not Applicable",
-    },
-    "con_alcohol": {"0": "No", "1": "Yes", "999999": "Not Applicable"},
-    "drnk_30days": {"0": "No", "1": "Yes", "999999": "Not Applicable"},
-    "smoke_status": {"0": "Never", "1": "Current", "2": "Former", "9": "Not Applicable"},
-    "alcohol_status": {"0": "Never", "1": "Current", "2": "Former", "9": "Not Applicable"},
-    "binge_drink": {"0": "Non-binge drinker", "1": "Binge drinker", "99": "Not Applicable"},
-    "anthro_group": {
-        "1": "0-60 Months Old",
-        "2": "61-120 Months Old",
-        "3": "121-228 Months Old",
-        "4": "Adults (19 Years Old and Above)",
-        "7": "Pregnant Mothers",
-        "8": "Lactating Women",
-    },
-    "mos_lactation": {"10": "Lactating, 0-6 Months", "11": "Lactating, 7-12 Months", "12": "Lactating, Over 1 Year"},
-    "mos_preg": {
-        "1": "Pregnant, 1 Month",
-        "2": "Pregnant, 2 Months",
-        "3": "Pregnant, 3 Months",
-        "4": "Pregnant, 4 Months",
-        "5": "Pregnant, 5 Months",
-        "6": "Pregnant, 6 Months",
-        "7": "Pregnant, 7 Months",
-        "8": "Pregnant, 8 Months",
-        "9": "Pregnant, 9 Months",
-    },
-    "psc": {
-        "0": "Non-pregnant/Non-lactating female members",
-        "1": "Pregnant, 1 month",
-        "2": "Pregnant, 2 months",
-        "3": "Pregnant, 3 months",
-        "4": "Pregnant, 4 months",
-        "5": "Pregnant, 5 months",
-        "6": "Pregnant, 6 months",
-        "7": "Pregnant, 7 months",
-        "8": "Pregnant, 8 months",
-        "9": "Pregnant, 9 months",
-        "10": "Lactating, 0-6 months",
-        "11": "Lactating, 7-12 months",
-        "12": "Lactating, over 1 year",
-        "99": "Male Member",
-    },
-}
-
-DISPLAY_LABEL_OVERRIDES = {
-    "age": "Age",
-    "sex": "Sex",
-    "uic": "Urinary Iodine Concentration (UIC)",
-    "vita": "Vitamin A",
-    "hemoglobin": "Hemoglobin",
-    "waist": "Waist Circumference",
-    "hip": "Hip Circumference",
-    "weight": "Weight",
-    "height": "Height",
-    "epwt_fg1": "Cereal and Cereal Products",
-    "smoke_status": "Smoking Status",
-    "current_smoking": "Current Smoking Frequency",
-    "ever_smk": "Smoking History",
-    "alcohol_status": "Alcohol Use Status",
-    "alcohol": "Alcohol Consumption",
-    "con_alcohol": "Alcohol Use in Past 12 Months",
-    "drnk_30days": "Alcohol Use in Past 30 Days",
-    "binge_drink": "Binge Drinking Status",
-}
-
-AUTO_COMPUTED_TOTAL_FIELDS = {
-    "Total_FoodIntake",
-    "Total_Food_epwt",
-    "Total_Energy",
-    "Total_Ener",
-    "Total_Protein",
-    "Total_Prot",
-}
-
-AVERAGE_DEFAULT_NOTICE_FIELDS = {
-    "Total_Calcium",
-    "Total_Calc",
-    "Total_Iron",
-    "Total_VitaminA",
-    "Total_VitA",
-    "Total_VitaminC",
-    "Total_VitC",
-    "Total_Thiamin",
-    "Total_Thia",
-    "Total_Riboflavin",
-    "Total_Ribo",
-    "Total_Niacin",
-    "Total_Nia",
-    "Total_CHO",
-    "Total_Fat",
-}
-
-FOOD_GROUP_COMPONENT_TOTALS = {
-    1: [2, 3, 4],
-    8: [9, 10],
-    11: [12, 13],
-    14: [15, 16],
-    19: [20, 21],
-    24: [25, 26, 27],
-}
-
-DIETARY_COMMON_FOODS = [
-    {"food": "Pandesal", "serving": "1 piece", "group": "Bread/Merienda", "carbs_g": 16, "protein_g": 3, "fat_g": 1.5, "sugar_g": 2, "note": "Approximate per piece"},
-    {"food": "Cooked white rice (kanin)", "serving": "1 cup", "group": "Staple/Starch", "carbs_g": 45, "protein_g": 4, "fat_g": 0.4, "sugar_g": 0.1, "note": "Approximate per cup"},
-    {"food": "Garlic fried rice (sinangag)", "serving": "1 cup", "group": "Staple/Starch", "carbs_g": 50, "protein_g": 5, "fat_g": 5, "sugar_g": 0.5, "note": "Oil affects fat"},
-    {"food": "Brown rice", "serving": "1 cup", "group": "Staple/Starch", "carbs_g": 45, "protein_g": 5, "fat_g": 1.8, "sugar_g": 0.4, "note": "Higher fiber"},
-    {"food": "Boiled saba", "serving": "1 medium", "group": "Staple/Starch", "carbs_g": 27, "protein_g": 1.2, "fat_g": 0.3, "sugar_g": 14, "note": "Common merienda"},
-    {"food": "Sweet potato (kamote)", "serving": "1 medium", "group": "Staple/Starch", "carbs_g": 24, "protein_g": 2, "fat_g": 0.1, "sugar_g": 7, "note": "Root crop"},
-    {"food": "Cassava", "serving": "1/2 cup cooked", "group": "Staple/Starch", "carbs_g": 38, "protein_g": 1.4, "fat_g": 0.3, "sugar_g": 1.7, "note": "Approximate"},
-    {"food": "Pancit (cooked)", "serving": "1 cup", "group": "Staple/Starch", "carbs_g": 35, "protein_g": 7, "fat_g": 7, "sugar_g": 2, "note": "Varies by recipe"},
-    {"food": "Banana", "serving": "1 medium", "group": "Fruit", "carbs_g": 27, "protein_g": 1.3, "fat_g": 0.4, "sugar_g": 14, "note": "Common daily fruit"},
-    {"food": "Mango", "serving": "1 cup slices", "group": "Fruit", "carbs_g": 25, "protein_g": 1.4, "fat_g": 0.6, "sugar_g": 23, "note": "Seasonal tropical fruit"},
-    {"food": "Papaya", "serving": "1 cup cubes", "group": "Fruit", "carbs_g": 16, "protein_g": 0.9, "fat_g": 0.4, "sugar_g": 11, "note": "Breakfast fruit"},
-    {"food": "Pineapple", "serving": "1 cup chunks", "group": "Fruit", "carbs_g": 22, "protein_g": 0.9, "fat_g": 0.2, "sugar_g": 16, "note": "Approximate"},
-    {"food": "Watermelon", "serving": "1 cup cubes", "group": "Fruit", "carbs_g": 12, "protein_g": 0.9, "fat_g": 0.2, "sugar_g": 9, "note": "Hydrating fruit"},
-    {"food": "Calamansi juice (sweetened)", "serving": "1 glass", "group": "Beverage", "carbs_g": 18, "protein_g": 0, "fat_g": 0, "sugar_g": 16, "note": "Depends on added sugar"},
-    {"food": "Malunggay leaves", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 4, "protein_g": 2.5, "fat_g": 0.5, "sugar_g": 1, "note": "Leafy vegetable"},
-    {"food": "Kangkong", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 3, "protein_g": 2, "fat_g": 0.2, "sugar_g": 0.4, "note": "Leafy vegetable"},
-    {"food": "Pechay", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 2.5, "protein_g": 1.2, "fat_g": 0.1, "sugar_g": 1, "note": "Common in soups"},
-    {"food": "Ampalaya", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 4, "protein_g": 1, "fat_g": 0.1, "sugar_g": 1.8, "note": "Bitter gourd"},
-    {"food": "Eggplant (talong)", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 4, "protein_g": 0.8, "fat_g": 0.2, "sugar_g": 2.2, "note": "Common in pinakbet"},
-    {"food": "Sitaw", "serving": "1/2 cup cooked", "group": "Vegetable", "carbs_g": 5, "protein_g": 1.3, "fat_g": 0.2, "sugar_g": 2, "note": "String beans"},
-    {"food": "Chicken adobo", "serving": "1 serving (90-100 g)", "group": "Protein", "carbs_g": 2, "protein_g": 24, "fat_g": 12, "sugar_g": 1, "note": "Sauce and skin vary"},
-    {"food": "Pork adobo", "serving": "1 serving (90 g)", "group": "Protein", "carbs_g": 2, "protein_g": 20, "fat_g": 18, "sugar_g": 1, "note": "Choose lean cuts"},
-    {"food": "Tinolang manok", "serving": "1 bowl", "group": "Protein", "carbs_g": 4, "protein_g": 20, "fat_g": 8, "sugar_g": 2, "note": "Includes broth/veg"},
-    {"food": "Sinigang na isda", "serving": "1 bowl", "group": "Protein", "carbs_g": 3, "protein_g": 18, "fat_g": 5, "sugar_g": 1, "note": "Fish + vegetables"},
-    {"food": "Grilled bangus", "serving": "1 palm-size piece", "group": "Protein", "carbs_g": 0, "protein_g": 22, "fat_g": 10, "sugar_g": 0, "note": "Fish option"},
-    {"food": "Galunggong", "serving": "1 medium fish", "group": "Protein", "carbs_g": 0, "protein_g": 18, "fat_g": 8, "sugar_g": 0, "note": "Affordable fish"},
-    {"food": "Canned sardines", "serving": "1 small can", "group": "Protein", "carbs_g": 2, "protein_g": 20, "fat_g": 10, "sugar_g": 0, "note": "Watch sodium"},
-    {"food": "Egg", "serving": "1 piece", "group": "Protein", "carbs_g": 0.6, "protein_g": 6.3, "fat_g": 5.3, "sugar_g": 0.2, "note": "Whole egg"},
-    {"food": "Tokwa (tofu)", "serving": "1/2 cup", "group": "Protein", "carbs_g": 2, "protein_g": 10, "fat_g": 6, "sugar_g": 0.3, "note": "Plant protein"},
-    {"food": "Ginisang monggo", "serving": "1 cup", "group": "Protein", "carbs_g": 19, "protein_g": 14, "fat_g": 4, "sugar_g": 3, "note": "Legume dish"},
-    {"food": "Milk", "serving": "1 cup", "group": "Dairy", "carbs_g": 12, "protein_g": 8, "fat_g": 8, "sugar_g": 12, "note": "Regular milk"},
-    {"food": "Yogurt (plain)", "serving": "3/4 cup", "group": "Dairy", "carbs_g": 9, "protein_g": 8, "fat_g": 3, "sugar_g": 8, "note": "Unsweetened preferred"},
-    {"food": "Cheese", "serving": "1 slice (30 g)", "group": "Dairy", "carbs_g": 1, "protein_g": 7, "fat_g": 9, "sugar_g": 0.5, "note": "Use in moderation"},
-    {"food": "Turon", "serving": "1 piece", "group": "Merienda", "carbs_g": 35, "protein_g": 3, "fat_g": 9, "sugar_g": 14, "note": "Fried snack"},
-    {"food": "Banana cue", "serving": "1 stick", "group": "Merienda", "carbs_g": 40, "protein_g": 1.5, "fat_g": 8, "sugar_g": 20, "note": "Sugared fried banana"},
-    {"food": "Camote cue", "serving": "1 stick", "group": "Merienda", "carbs_g": 42, "protein_g": 2, "fat_g": 8, "sugar_g": 18, "note": "Sugared fried root crop"},
-    {"food": "Lugaw/arroz caldo", "serving": "1 bowl", "group": "Merienda", "carbs_g": 30, "protein_g": 6, "fat_g": 4, "sugar_g": 1, "note": "Rice porridge"},
-    {"food": "Champorado", "serving": "1 bowl", "group": "Merienda", "carbs_g": 45, "protein_g": 5, "fat_g": 6, "sugar_g": 20, "note": "Sweet cocoa porridge"},
-    {"food": "Puto", "serving": "2 pieces", "group": "Merienda", "carbs_g": 22, "protein_g": 2.5, "fat_g": 1.5, "sugar_g": 8, "note": "Rice cake"},
-    {"food": "Kutsinta", "serving": "2 pieces", "group": "Merienda", "carbs_g": 24, "protein_g": 1.5, "fat_g": 0.5, "sugar_g": 10, "note": "Rice snack"},
-    {"food": "Biko", "serving": "1 small slice", "group": "Merienda", "carbs_g": 38, "protein_g": 3, "fat_g": 7, "sugar_g": 16, "note": "Sticky rice dessert"},
-    {"food": "Halo-halo", "serving": "1 glass", "group": "Merienda", "carbs_g": 60, "protein_g": 6, "fat_g": 9, "sugar_g": 40, "note": "Dessert; high sugar"},
-    {"food": "Milk tea", "serving": "1 cup", "group": "Sugary drinks", "carbs_g": 45, "protein_g": 2, "fat_g": 7, "sugar_g": 35, "note": "Depends on syrup/toppings"},
-    {"food": "3-in-1 coffee", "serving": "1 sachet cup", "group": "Sugary drinks", "carbs_g": 12, "protein_g": 1, "fat_g": 3, "sugar_g": 10, "note": "Contains sugar/creamer"},
-    {"food": "Softdrink", "serving": "330 ml can", "group": "Sugary drinks", "carbs_g": 35, "protein_g": 0, "fat_g": 0, "sugar_g": 35, "note": "Limit intake"},
-]
-
-DIETARY_FAQ = [
-    ("How do I estimate grams if I do not weigh food?", "Use household measures (cup, spoon, piece) and choose the closest sample food in the guide."),
-    ("Should I include mixed dishes?", "Yes. Break mixed dishes into main ingredients (rice, meat/fish, vegetables, oil)."),
-    ("Do beverages count?", "Yes. Sweet drinks and milk-based drinks should be included in dietary estimates."),
-    ("Do I enter raw or cooked amounts?", "Prefer cooked edible portions for consistency with typical intake reporting."),
-    ("What if I am unsure of exact intake?", "Enter your best estimate based on usual intake over recent days."),
-    ("How should I record merienda?", "Include all snacks and sweet drinks consumed between meals; they are part of total dietary intake."),
-]
-
-
-st.markdown(
-    """
-    <style>
-      .stApp {
-        background:
-          radial-gradient(circle at top left, rgba(220, 38, 38, 0.12), transparent 32%),
-          radial-gradient(circle at top right, rgba(37, 99, 235, 0.10), transparent 28%),
-          linear-gradient(180deg, #f8f5f2 0%, #f2ede8 45%, #fcfbfa 100%);
-        color: #18212f;
-      }
-      .hero {
-        padding: 1.1rem 1.4rem;
-        border-radius: 28px;
-        border: 1px solid rgba(24, 33, 47, 0.08);
-        background: linear-gradient(135deg, rgba(17, 24, 39, 0.92), rgba(127, 29, 29, 0.90));
-        color: #fff;
-        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
-      }
-      .hero h1 {
-        margin: 0;
-        font-size: 2.1rem;
-        letter-spacing: -0.03em;
-      }
-      .hero p {
-        margin: 0.35rem 0 0;
-        color: rgba(255, 255, 255, 0.84);
-        max-width: 72ch;
-      }
-      .glass-card {
-        padding: 1rem 1.1rem;
-        border-radius: 22px;
-        border: 1px solid rgba(24, 33, 47, 0.08);
-        background: rgba(255, 255, 255, 0.76);
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-      }
-      .kpi-title {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        color: #64748b;
-      }
-      .kpi-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin-top: 0.15rem;
-        color: #0f172a;
-      }
-      .kpi-subtitle {
-        color: #64748b;
-        font-size: 0.92rem;
-        margin-top: 0.18rem;
-      }
-      section[data-testid="stSidebar"] {
-        background: rgba(255, 255, 255, 0.82);
-        border-right: 1px solid rgba(15, 23, 42, 0.08);
-      }
-      .block-container {
-        padding-top: 1.1rem;
-      }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-st.markdown(
-        """
-        <style>
-            .stApp {
-                background:
-                    radial-gradient(circle at top left, rgba(220, 38, 38, 0.10), transparent 30%),
-                    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 26%),
-                    linear-gradient(180deg, #f8f5f2 0%, #f2ede8 45%, #fcfbfa 100%);
-                color: #18212f;
-            }
-            #MainMenu,
-            header,
-            footer,
-            .stAppHeader,
-            [data-testid="stHeader"],
-            [data-testid="stToolbar"],
-            [data-testid="stDecoration"] {
-                visibility: hidden !important;
-                display: none !important;
-                height: 0 !important;
-            }
-            .block-container { padding-top: 0 !important; }
-            [data-testid="stAppViewContainer"] > .main {
-                padding-top: 0 !important;
-            }
-            [data-testid="stAppViewContainer"] .main .block-container {
-                padding-top: 0 !important;
-                margin-top: 0 !important;
-            }
-            /* ── Landing ── */
-            .landing-hero {
-                background: linear-gradient(145deg, #0f172a 0%, #7f1d1d 55%, #1e3a5f 100%);
-                color: #fff;
-                padding: 2rem 2rem 5.75rem;
-                text-align: center;
-                position: relative;
-                overflow: hidden;
-                border-radius: 0 0 56px 56px;
-                margin: -2.75rem -1rem 2.6rem;
-                min-height: 29rem;
-            }
-            .landing-hero::before {
-                content: "";
-                position: absolute;
-                inset: 0;
-                background:
-                    radial-gradient(circle at 18% 45%, rgba(220,38,38,0.28) 0%, transparent 52%),
-                    radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22) 0%, transparent 44%);
-                pointer-events: none;
-            }
-            .landing-hero h1 {
-                font-size: 2.5rem; font-weight: 800; letter-spacing: -0.025em;
-                margin: 0 0 0.9rem; position: relative;
-                line-height: 1.2;
-            }
-            .landing-badge {
-                display: inline-block;
-                background: rgba(255,255,255,0.13);
-                border: 1px solid rgba(255,255,255,0.24);
-                border-radius: 999px;
-                padding: 0.3rem 1.1rem;
-                font-size: 0.82rem; letter-spacing: 0.12em; text-transform: uppercase;
-                margin-bottom: 1.4rem; position: relative;
-            }
-            .landing-sub {
-                font-size: 1.08rem; color: rgba(255,255,255,0.90);
-                max-width: 760px; margin: 0 auto; line-height: 1.72; position: relative;
-                text-align: center;
-                display: block;
-                width: 100%;
-            }
-            .feature-cards {
-                display: flex; gap: 1.2rem; justify-content: center;
-                flex-wrap: wrap; padding: 2.4rem 1rem 0.4rem;
-            }
-            .feature-card {
-                background: rgba(255,255,255,0.82);
-                border: 1px solid rgba(24,33,47,0.09);
-                border-radius: 20px; padding: 1.55rem 1.6rem; width: 210px;
-                box-shadow: 0 8px 30px rgba(15,23,42,0.07); text-align: center;
-            }
-            .feature-card .fc-icon { font-size: 2rem; margin-bottom: 0.55rem; }
-            .feature-card .fc-title { font-weight: 700; font-size: 0.96rem; color: #0f172a; margin-bottom: 0.3rem; }
-            .feature-card .fc-desc { font-size: 0.83rem; color: #475569; line-height: 1.5; }
-            .landing-disclaimer {
-                text-align: center; color: #94a3b8; font-size: 0.78rem;
-                margin-top: 1.1rem; padding-bottom: 0.2rem;
-            }
-            /* ── App page ── */
-            .glass-card {
-                padding: 1rem 1.1rem; border-radius: 22px;
-                border: 1px solid rgba(24,33,47,0.08);
-                background: rgba(255,255,255,0.78);
-                box-shadow: 0 18px 40px rgba(15,23,42,0.07);
-                margin-bottom: 1rem;
-            }
-            .section-header {
-                padding: 1.6rem 0 0.4rem;
-                border-bottom: 2px solid rgba(220,38,38,0.18);
-                margin-bottom: 1.3rem;
-            }
-            .section-header h2 { font-size: 1.55rem; font-weight: 700; margin: 0; color: #0f172a; }
-            .section-header p { color: #64748b; margin: 0.25rem 0 0; font-size: 0.93rem; }
-            .output-hero {
-                background: linear-gradient(135deg, rgba(17,24,39,0.94), rgba(127,29,29,0.88));
-                border-radius: 22px; padding: 1.4rem 1.8rem; color: #fff; margin-bottom: 0;
-            }
-            .output-hero .oh-label { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(255,255,255,0.62); }
-            .output-hero .oh-value { font-size: 2.1rem; font-weight: 800; margin-top: 0.1rem; }
-            .output-hero .oh-sub { font-size: 0.87rem; color: rgba(255,255,255,0.70); margin-top: 0.15rem; }
-            .risk-badge { display: inline-block; border-radius: 999px; padding: 0.32rem 1rem; font-size: 0.95rem; font-weight: 700; }
-            .risk-low        { background: #dcfce7; color: #15803d; }
-            .risk-medium     { background: #fef9c3; color: #92400e; }
-            .risk-high       { background: #fee2e2; color: #b91c1c; }
-            .risk-at-risk    { background: #fee2e2; color: #b91c1c; }
-            .risk-not-at-risk{ background: #dcfce7; color: #15803d; }
-            .kpi-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.18em; color: #64748b; }
-            .kpi-value { font-size: 1.8rem; font-weight: 700; margin-top: 0.15rem; color: #0f172a; }
-            .kpi-subtitle { color: #64748b; font-size: 0.92rem; margin-top: 0.18rem; }
-            @media (max-width: 768px) {
-                .output-hero {
-                    margin-bottom: 0.85rem;
-                }
-            }
-            /* Hide +/- step buttons on all number inputs (auto-computed dietary sums) */
-            button[data-testid="stNumberInputStepDown"],
-            button[data-testid="stNumberInputStepUp"] {
-                display: none !important;
-            }
-            section[data-testid="stSidebar"] {
-                background: rgba(255,255,255,0.82);
-                border-right: 1px solid rgba(15,23,42,0.08);
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-)
+apply_global_styles()
 
 
 @st.cache_resource(show_spinner=False)
@@ -586,22 +116,24 @@ def dictionary_name_candidates(feature_name: str) -> list[str]:
 
 
 def field_help_text(feature_name: str, dictionary_labels: dict[str, str]) -> str | None:
-    for candidate in dictionary_name_candidates(feature_name):
+    candidates = dictionary_name_candidates(feature_name)
+    for candidate in candidates:
         if candidate in VARIABLE_DEFINITION_OVERRIDES:
             return VARIABLE_DEFINITION_OVERRIDES[candidate]
 
-    for candidate in dictionary_name_candidates(feature_name):
+    for candidate in candidates:
         if candidate in dictionary_labels and dictionary_labels[candidate]:
             return dictionary_labels[candidate]
     return None
 
 
 def field_value_labels(feature_name: str, dictionary_value_labels: dict[str, dict[str, str]]) -> dict[str, str]:
-    for candidate in dictionary_name_candidates(feature_name):
+    candidates = dictionary_name_candidates(feature_name)
+    for candidate in candidates:
         if candidate in VALUE_LABEL_OVERRIDES:
             return VALUE_LABEL_OVERRIDES[candidate]
 
-    for candidate in dictionary_name_candidates(feature_name):
+    for candidate in candidates:
         if candidate in dictionary_value_labels and dictionary_value_labels[candidate]:
             return dictionary_value_labels[candidate]
 
@@ -619,16 +151,16 @@ def _sorted_value_label_keys(value_label_map: dict[str, str]) -> list[str]:
 
 
 def _clean_label_text(text: str) -> str:
-    primary = text.split(":", 1)[0].strip()
-    return primary.replace("  ", " ")
+    return text.split(":", 1)[0].strip().replace("  ", " ")
 
 
 def field_display_label(feature_name: str, dictionary_labels: dict[str, str]) -> str:
-    for candidate in dictionary_name_candidates(feature_name):
+    candidates = dictionary_name_candidates(feature_name)
+    for candidate in candidates:
         if candidate in DISPLAY_LABEL_OVERRIDES:
             return DISPLAY_LABEL_OVERRIDES[candidate]
 
-    for candidate in dictionary_name_candidates(feature_name):
+    for candidate in candidates:
         if candidate in dictionary_labels and dictionary_labels[candidate]:
             return _clean_label_text(dictionary_labels[candidate])
 
@@ -639,15 +171,6 @@ def field_display_label(feature_name: str, dictionary_labels: dict[str, str]) ->
     fallback = feature_name.replace("epwt_", "").replace("_", " ").strip()
     return fallback.title()
 
-
-MISSING_INPUT_CODES = {9.0, 99.0, 888888.0, 999999.0}
-CONDITIONALLY_ALLOWED_NA_CODES: dict[str, set[float]] = {
-    "con_alcohol": {999999.0},
-    "drnk_30days": {999999.0},
-    "binge_drink": {99.0},
-}
-
-
 def is_missing_input_value(value: Any) -> bool:
     if value is None:
         return True
@@ -655,9 +178,7 @@ def is_missing_input_value(value: Any) -> bool:
         numeric_value = float(value)
     except (TypeError, ValueError):
         return False
-    if np.isnan(numeric_value):
-        return True
-    return numeric_value in MISSING_INPUT_CODES
+    return np.isnan(numeric_value) or numeric_value in MISSING_INPUT_CODES
 
 
 def is_conditionally_allowed_na_value(feature_name: str, value: Any) -> bool:
@@ -668,9 +189,7 @@ def is_conditionally_allowed_na_value(feature_name: str, value: Any) -> bool:
         numeric_value = float(value)
     except (TypeError, ValueError):
         return False
-    if np.isnan(numeric_value):
-        return False
-    return numeric_value in allowed_codes
+    return not np.isnan(numeric_value) and numeric_value in allowed_codes
 
 
 def render_top_age_sex_fields(
@@ -704,17 +223,6 @@ def render_top_age_sex_fields(
             )
             widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
             rendered_feature_names.add("sex")
-
-
-def render_dietary_quick_guide_popup():
-    container = st.popover("Open Dietary Sample Foods & FAQ") if hasattr(st, "popover") else st.expander("Open Dietary Sample Foods & FAQ", expanded=False)
-    with container:
-        st.markdown("##### Common Food Samples (Web-informed)")
-        st.caption("Compiled from public dietary guidance patterns (NHS Eatwell categories) and common household food portions.")
-        st.table(pd.DataFrame(DIETARY_COMMON_FOODS))
-        st.markdown("##### FAQ")
-        for question, answer in DIETARY_FAQ:
-            st.markdown(f"- **{question}** {answer}")
 
 
 def _format_numeric_text(value: float, step: float) -> str:
@@ -767,7 +275,8 @@ def render_editable_numeric_input(
 def render_number_input(feature_name: str, dictionary_labels: dict[str, str], dictionary_value_labels: dict[str, dict[str, str]]):
     minimum, maximum, step = feature_range(feature_name)
     default_value = feature_default(feature_name)
-    help_text = field_help_text(feature_name, dictionary_labels)
+    raw_help = field_help_text(feature_name, dictionary_labels)
+    help_text = None if feature_name in NO_HELP_FEATURES else raw_help
     display_label = field_display_label(feature_name, dictionary_labels)
     widget_key = f"input_{feature_name}"
     is_food_group_field = feature_name.startswith("fg") or feature_name.startswith("epwt_fg")
@@ -1006,11 +515,9 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
         con_alcohol_disabled = True
     elif _is_code(alcohol_status, 2):
         alcohol_auto = 1
-        con_alcohol_auto = 0
+        alcohol_disabled = True
         drnk_30days_auto = 999999
         binge_auto = 99
-        alcohol_disabled = True
-        con_alcohol_disabled = True
         drnk_30days_disabled = True
         binge_disabled = True
 
@@ -1129,87 +636,6 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
     return values
 
 
-def make_indicator_chart(score: float, lower: float, upper: float):
-    lower_pct = float(lower * 100.0)
-    upper_pct = float(upper * 100.0)
-    score_pct = float(score * 100.0)
-
-    # Ensure the interval is visually readable when bounds nearly coincide.
-    width = upper_pct - lower_pct
-    if width < 2.0:
-        pad = (2.0 - width) / 2.0
-        lower_pct = max(0.0, lower_pct - pad)
-        upper_pct = min(100.0, upper_pct + pad)
-
-    # Auto-zoom: score ± 10 unless the uncertainty interval is wider than 20 pts.
-    interval_range = upper_pct - lower_pct
-    if interval_range <= 20.0:
-        x_min = max(0.0, score_pct - 10.0)
-        x_max = min(100.0, score_pct + 10.0)
-    else:
-        _pad_ext = 5.0
-        x_min = max(0.0, lower_pct - _pad_ext)
-        x_max = min(100.0, math.ceil((upper_pct + _pad_ext) / 10.0) * 10.0)
-
-    dtick_val = 5 if (x_max - x_min) <= 25 else 10
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=[lower_pct, upper_pct],
-            y=[0, 0],
-            mode="lines",
-            line=dict(color="#0f172a", width=12),
-            hovertemplate="Interval: %{x:.1f}%<extra></extra>",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[lower_pct, upper_pct],
-            y=[0, 0],
-            mode="markers",
-            marker=dict(color="#0f172a", size=10),
-            hovertemplate="Bound: %{x:.1f}%<extra></extra>",
-            showlegend=False,
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[score_pct],
-            y=[0],
-            mode="markers",
-            marker=dict(color="#dc2626", size=16, line=dict(color="white", width=2)),
-            hovertemplate="Risk score: %{x:.1f}%<extra></extra>",
-            showlegend=False,
-        )
-    )
-    fig.add_annotation(
-        x=score_pct,
-        y=0.28,
-        text=f"{score_pct:.1f}%",
-        showarrow=False,
-        font=dict(size=12, color="#0f172a"),
-    )
-    fig.update_layout(
-        height=210,
-        margin=dict(l=10, r=10, t=16, b=28),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            title="Probability (%)",
-            range=[x_min, x_max],
-            showgrid=True,
-            gridcolor="rgba(100,116,139,0.25)",
-            tickmode="linear",
-            dtick=dtick_val,
-            zeroline=False,
-        ),
-        yaxis=dict(visible=False, range=[-0.5, 0.5]),
-    )
-    return fig
-
-
 def make_gauge_chart(score: float):
     fig = go.Figure(
         go.Indicator(
@@ -1231,170 +657,27 @@ def make_gauge_chart(score: float):
     return fig
 
 
-def _build_background_samples(feature_names: list[str], rows: int = 80) -> pd.DataFrame:
-    rng = np.random.default_rng(42)
-    records: list[dict[str, float]] = []
-
-    for _ in range(rows):
-        row: dict[str, float] = {}
-        for feature_name in feature_names:
-            minimum, maximum, _ = feature_range(feature_name)
-            default_value = feature_default(feature_name)
-
-            if maximum <= minimum:
-                row[feature_name] = float(default_value)
-                continue
-
-            spread = (maximum - minimum) * 0.08
-            sampled = float(rng.normal(loc=default_value, scale=max(spread, 1e-6)))
-            row[feature_name] = float(np.clip(sampled, minimum, maximum))
-
-        records.append(row)
-
-    return pd.DataFrame(records, columns=feature_names)
-
-
-def _prediction_fn_for_explainability(model: Any, feature_names: list[str]):
-    def _predict(nd_array: np.ndarray) -> np.ndarray:
-        frame = pd.DataFrame(nd_array, columns=feature_names)
-        proba = model.predict_proba(frame)
-        return np.asarray(proba)[:, 1]
-
-    return _predict
-
-
-def _try_compute_shap(model: Any, feature_names: list[str], input_frame: pd.DataFrame):
-    try:
-        import shap  # type: ignore
-    except Exception:
-        return None, None, "SHAP package is not installed. Install with: pip install shap"
-
-    try:
-        background = _build_background_samples(feature_names, rows=40)
-        predict_fn = _prediction_fn_for_explainability(model, feature_names)
-        explainer = shap.KernelExplainer(predict_fn, background.values)
-
-        local_shap_values = explainer.shap_values(input_frame.values, nsamples=100)
-        local_values = np.asarray(local_shap_values).reshape(-1)
-        local_df = pd.DataFrame(
-            {
-                "feature": feature_names,
-                "shap_value": local_values,
-                "abs_shap": np.abs(local_values),
-            }
-        ).sort_values("abs_shap", ascending=False)
-
-        global_shap_values = explainer.shap_values(background.values, nsamples=40)
-        global_array = np.asarray(global_shap_values)
-        if global_array.ndim == 1:
-            global_array = global_array.reshape(1, -1)
-        global_importance = np.mean(np.abs(global_array), axis=0)
-        global_df = pd.DataFrame(
-            {
-                "feature": feature_names,
-                "mean_abs_shap": global_importance,
-            }
-        ).sort_values("mean_abs_shap", ascending=False)
-
-        return local_df, global_df, None
-    except Exception as exc:
-        return None, None, f"SHAP computation failed: {exc}"
-
-
-def _try_compute_lime(model: Any, feature_names: list[str], input_frame: pd.DataFrame):
-    try:
-        from lime.lime_tabular import LimeTabularExplainer  # type: ignore
-    except Exception:
-        return None, "LIME package is not installed. Install with: pip install lime"
-
-    try:
-        background = _build_background_samples(feature_names, rows=120)
-        background = background.replace([np.inf, -np.inf], np.nan)
-        for name in feature_names:
-            background[name] = pd.to_numeric(background[name], errors="coerce").fillna(float(feature_default(name)))
-
-        def _lime_predict(nd_array: np.ndarray) -> np.ndarray:
-            frame = pd.DataFrame(nd_array, columns=feature_names)
-            frame = frame.replace([np.inf, -np.inf], np.nan)
-            for name in feature_names:
-                frame[name] = pd.to_numeric(frame[name], errors="coerce").fillna(float(feature_default(name)))
-            return np.asarray(model.predict_proba(frame))
-
-        lime_attempts = [
-            {"discretize_continuous": True, "num_features": min(12, len(feature_names)), "num_samples": 3000},
-            {"discretize_continuous": False, "num_features": min(10, len(feature_names)), "num_samples": 2000},
-        ]
-
-        last_error: Exception | None = None
-        for attempt in lime_attempts:
-            try:
-                explainer = LimeTabularExplainer(
-                    training_data=background.values,
-                    feature_names=feature_names,
-                    class_names=["No HTN", "HTN"],
-                    mode="classification",
-                    discretize_continuous=attempt["discretize_continuous"],
-                    random_state=42,
-                )
-
-                explanation = explainer.explain_instance(
-                    data_row=input_frame.iloc[0].values,
-                    predict_fn=_lime_predict,
-                    num_features=int(attempt["num_features"]),
-                    num_samples=int(attempt["num_samples"]),
-                    top_labels=1,
-                )
-
-                available_labels = sorted(getattr(explanation, "local_exp", {}).keys())
-                selected_label = 1 if 1 in available_labels else (available_labels[0] if available_labels else None)
-                if selected_label is None:
-                    pairs = []
-                else:
-                    pairs = explanation.as_list(label=int(selected_label))
-                lime_df = pd.DataFrame(pairs, columns=["rule", "weight"]) if pairs else pd.DataFrame(columns=["rule", "weight"])
-                return lime_df, None
-            except Exception as exc:
-                last_error = exc
-
-        return None, f"LIME computation failed: {last_error}"
-    except Exception as exc:
-        return None, f"LIME computation failed: {exc}"
-
-
 def _food_group_prefix_and_index(name: str) -> tuple[str, int] | None:
-    if name.startswith("epwt_fg"):
-        suffix = name[len("epwt_fg"):]
-        return ("epwt_fg", int(suffix)) if suffix.isdigit() else None
-    if name.startswith("fg"):
-        suffix = name[len("fg"):]
-        return ("fg", int(suffix)) if suffix.isdigit() else None
+    for prefix in ("epwt_fg", "fg"):
+        if name.startswith(prefix):
+            suffix = name[len(prefix):]
+            return (prefix, int(suffix)) if suffix.isdigit() else None
     return None
 
 
 def _food_group_is_component_total(name: str) -> bool:
-    parsed = _food_group_prefix_and_index(name)
-    if parsed is None:
-        return False
-    _, idx = parsed
-    return idx in FOOD_GROUP_COMPONENT_TOTALS
+    return (parsed := _food_group_prefix_and_index(name)) is not None and parsed[1] in FOOD_GROUP_COMPONENT_TOTALS
 
 
 def _food_group_is_addend(name: str) -> bool:
-    parsed = _food_group_prefix_and_index(name)
-    if parsed is None:
-        return False
-    _, idx = parsed
-    addend_indices = {num for nums in FOOD_GROUP_COMPONENT_TOTALS.values() for num in nums}
-    return idx in addend_indices
+    return (parsed := _food_group_prefix_and_index(name)) is not None and parsed[1] in {num for nums in FOOD_GROUP_COMPONENT_TOTALS.values() for num in nums}
 
 
 def _food_group_addend_names_for_total(total_name: str, available_names: set[str]) -> list[str]:
-    parsed = _food_group_prefix_and_index(total_name)
-    if parsed is None:
+    if (parsed := _food_group_prefix_and_index(total_name)) is None:
         return []
     prefix, total_idx = parsed
-    addend_indices = FOOD_GROUP_COMPONENT_TOTALS.get(total_idx, [])
-    return [f"{prefix}{idx}" for idx in addend_indices if f"{prefix}{idx}" in available_names]
+    return [f"{prefix}{idx}" for idx in FOOD_GROUP_COMPONENT_TOTALS.get(total_idx, []) if f"{prefix}{idx}" in available_names]
 
 
 def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names: list[str]) -> dict[str, float]:
@@ -1488,109 +771,32 @@ def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names:
 
 
 def risk_label_from_score(probability: float) -> str:
-    if probability > 0.5:
-        return "At Risk of Hypertension"
-    return "Not at Risk"
+    return "At Risk of Hypertension" if probability > 0.5 else "Not at Risk"
 
 
-NON_ACTIONABLE_FEATURES = {"age", "sex", "ethnicity", "ethnicity_group"}
+def _model_column_source_input_feature(model_column: str, input_features: list[str]) -> str | None:
+    # Map transformed model columns (e.g., num__age, cat__ethnicity_1.0) back to raw input features.
+    token = model_column.split("__", 1)[1] if "__" in model_column else model_column
+    lowered_features = sorted({str(name).lower() for name in input_features}, key=len, reverse=True)
+    token_lc = token.lower()
+
+    if token_lc in lowered_features:
+        return token_lc
+
+    for feature_name in lowered_features:
+        if token_lc.startswith(f"{feature_name}_"):
+            return feature_name
+
+    return None
 
 
-def _compute_counterfactuals(
-    model: Any,
-    preprocessor: Any,
-    calibrator: Any,
-    raw_input_values: dict,
-    input_feature_names: list[str],
-    dictionary_labels: dict[str, str],
-    current_probability: float,
-    top_n: int = 8,
-) -> pd.DataFrame:
-    """Wachter-style counterfactuals: for each actionable feature independently,
-    find the value x' that minimises the Wachter objective
-
-        L(x') = λ·(f(x') - y_target)² + (x' - x)² / σ²
-
-    where y_target = 0.49 (just below the decision boundary), f is the model,
-    x is the current feature value, and σ is the feature's value range used
-    for normalisation. scipy.optimize.minimize_scalar is used to solve the
-    1-D problem for each feature within its valid range.
-    """
-    from scipy.optimize import minimize_scalar  # type: ignore
-
-    LAMBDA = 0.5   # trade-off: prediction loss vs. proximity to original
-    Y_TARGET = 0.49  # target probability – just below decision boundary
-
-    scan_features = [
-        fname for fname in input_feature_names
-        if fname in RANGE_HINTS
-        and fname not in NON_ACTIONABLE_FEATURES
-        and not fname.startswith("epwt_fg")
-        and not fname.startswith("fg")
-    ]
-
-    def _predict_for_value(fname: str, val: float) -> float:
-        test_inputs = dict(raw_input_values)
-        test_inputs[fname] = val
-        try:
-            frame = make_input_frame(input_feature_names, test_inputs)
-            model_frame = prepare_model_input(frame, preprocessor)
-            return predict_probability(model, model_frame)
-        except Exception:
-            return current_probability
-
-    rows = []
-    for fname in scan_features:
-        current_val = raw_input_values.get(fname)
-        if current_val is None or (isinstance(current_val, float) and np.isnan(current_val)):
-            continue
-        current_val = float(current_val)
-
-        minimum, maximum, _ = feature_range(fname)
-        feature_range_width = max(maximum - minimum, 1e-6)
-
-        def _wachter_loss(val: float) -> float:
-            prob = _predict_for_value(fname, val)
-            pred_loss = (prob - Y_TARGET) ** 2
-            proximity = ((val - current_val) / feature_range_width) ** 2
-            return LAMBDA * pred_loss + proximity
-
-        try:
-            opt = minimize_scalar(
-                _wachter_loss,
-                bounds=(minimum, maximum),
-                method="bounded",
-                options={"xatol": 1e-3, "maxiter": 200},
-            )
-            cf_val = float(np.clip(opt.x, minimum, maximum))
-        except Exception:
-            continue
-
-        cf_prob = _predict_for_value(fname, cf_val)
-        reduction = (current_probability - cf_prob) * 100.0
-
-        # Only report if the counterfactual actually reduces risk
-        if reduction <= 0.05 or np.isclose(cf_val, current_val, atol=1e-3):
-            continue
-
-        rows.append({
-            "Feature": dictionary_labels.get(fname, fname),
-            "Current Value": round(current_val, 2),
-            "Suggested Value": round(cf_val, 2),
-            "Current Risk": f"{current_probability * 100:.1f}%",
-            "Projected Risk": f"{cf_prob * 100:.1f}%",
-            "Risk Reduction": f"{reduction:.1f}%",
-            "_delta": reduction,
-        })
-
-    if not rows:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(rows)
-    df = df.sort_values("_delta", ascending=False).drop(columns=["_delta"]).head(top_n).reset_index(drop=True)
-    return df
-
-
+def resolve_explainability_columns(
+    model_columns: list[str],
+    input_features: list[str],
+    rendered_input_features: set[str],
+) -> list[str]:
+    rendered_lc = {str(name).lower() for name in rendered_input_features}
+    return [str(c) for c in model_columns if (s := _model_column_source_input_feature(str(c), input_features)) and s in rendered_lc]
 
 if "show_form" not in st.session_state:
     st.session_state.show_form = False
@@ -1729,7 +935,7 @@ else:
         core_cols = st.columns(3)
 
         priority = ["hemoglobin"]
-        clinical_features = [f for f in grouped_features["Core clinical"] if f not in engineered_names and f not in {"age", "sex", "uic", "pa_met", "vita"}]
+        clinical_features = [f for f in grouped_features["Core clinical"] if f not in engineered_names and f not in {"age", "sex"}]
         if "hemoglobin" in feature_names and "hemoglobin" not in clinical_features:
             clinical_features.append("hemoglobin")
         ordered_features: list[str] = [f for f in priority if f in clinical_features]
@@ -1922,6 +1128,7 @@ else:
         st.session_state.pop("_result", None)
         st.session_state.pop("_input_frame", None)
         st.session_state.pop("_model_feature_names", None)
+        st.session_state.pop("_rendered_input_features", None)
 
     dietary_all_zero = False
     if dietary_addend_fields:
@@ -1934,6 +1141,7 @@ else:
             st.session_state.pop("_result", None)
             st.session_state.pop("_input_frame", None)
             st.session_state.pop("_model_feature_names", None)
+            st.session_state.pop("_rendered_input_features", None)
 
     st.markdown("<br>", unsafe_allow_html=True)
     _, submit_col, _ = st.columns([1.3, 1.2, 1.3])
@@ -2011,8 +1219,9 @@ else:
         st.session_state._result = result
         st.session_state._input_frame = model_input_frame
         st.session_state._model_feature_names = list(model_input_frame.columns)
-        st.session_state._raw_input_values = input_values
         st.session_state._input_feature_names = feature_names
+        st.session_state._rendered_input_features = sorted(rendered_feature_names)
+        st.session_state._all_widget_values = dict(derived_widget_values)
         st.session_state._scroll_to_output = True
 
     if st.session_state.scored and hasattr(st.session_state, "_result"):
@@ -2081,15 +1290,15 @@ else:
             unsafe_allow_html=True,
         )
 
-        _raw_vals = st.session_state.get("_raw_input_values", {})
+        _all_wvals = st.session_state.get("_all_widget_values", {})
         _input_fnames = st.session_state.get("_input_feature_names", [])
-        if _raw_vals and _input_fnames:
+        if _all_wvals and _input_fnames:
             with st.spinner("Computing counterfactuals..."):
-                cf_df = _compute_counterfactuals(
+                cf_df = compute_counterfactuals(
                     model=unwrap_model(model),
                     preprocessor=preprocessor,
-                    calibrator=None,
-                    raw_input_values=_raw_vals,
+                    calibrator=calibrator,
+                    all_widget_values=_all_wvals,
                     input_feature_names=_input_fnames,
                     dictionary_labels=dictionary_labels,
                     current_probability=result.calibrated_probability,
@@ -2115,8 +1324,31 @@ else:
 
         with st.spinner("Computing SHAP and LIME explanations..."):
             explain_feature_names = st.session_state.get("_model_feature_names", model_feature_names)
-            shap_local_df, shap_global_df, shap_error = _try_compute_shap(explain_model, explain_feature_names, input_frame)
-            lime_df, lime_error = _try_compute_lime(explain_model, explain_feature_names, input_frame)
+            rendered_inputs = set(st.session_state.get("_rendered_input_features", []))
+            input_features_for_mapping = st.session_state.get("_input_feature_names", feature_names)
+            explain_feature_names = resolve_explainability_columns(
+                model_columns=list(explain_feature_names),
+                input_features=list(input_features_for_mapping),
+                rendered_input_features=rendered_inputs,
+            )
+
+            if explain_feature_names:
+                explain_input_frame = input_frame.loc[:, explain_feature_names].copy()
+                shap_local_df, shap_global_df, shap_error = try_compute_shap(
+                    explain_model,
+                    explain_feature_names,
+                    explain_input_frame,
+                    base_input_frame=input_frame,
+                )
+                lime_df, lime_error = try_compute_lime(
+                    explain_model,
+                    explain_feature_names,
+                    explain_input_frame,
+                    base_input_frame=input_frame,
+                )
+            else:
+                shap_local_df, shap_global_df, shap_error = None, None, "No explainability columns are currently mapped to visible webpage inputs."
+                lime_df, lime_error = None, "No explainability columns are currently mapped to visible webpage inputs."
 
         exp_a, exp_b, exp_c = st.columns(3)
 
