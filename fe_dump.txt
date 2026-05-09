@@ -1,0 +1,390 @@
+﻿--- Cell 5 ---
+def _normalize_join_columns(df_in):
+    rename_map = {}
+    col_lc = {c.lower(): c for c in df_in.columns}
+    for key in ['hhnum', 'member_code']:
+        if key in col_lc and col_lc[key] != key:
+            rename_map[col_lc[key]] = key
+    return df_in.rename(columns=rename_map)
+
+def _find_anthropometric_dataset_path():
+    for base in DATASET2015_CANDIDATES:
+        anthro_dir = base / 'Anthropometric'
+        if not anthro_dir.exists():
+            continue
+
+        csv_paths = sorted([p for p in anthro_dir.glob('*.csv') if 'dictionary' not in p.name.lower()])
+        preferred = [
+            p for p in csv_paths
+            if ('data-set' in p.name.lower()) or ('dataset' in p.name.lower())
+        ]
+        for p in preferred + csv_paths:
+            return p
+    return None
+
+def _prepare_merged_with_anthro(base_path):
+    if not base_path.exists():
+        return None
+
+    try:
+        base_df = pd.read_csv(base_path)
+    except Exception:
+        return None
+
+    anthro_tokens = ['weight', 'height', 'waist', 'hip', 'bmi', 'whr']
+    has_anthro = any(any(tok in c.lower() for tok in anthro_tokens) for c in base_df.columns)
+    if has_anthro:
+        return base_path
+
+    anthro_path = _find_anthropometric_dataset_path()
+    if anthro_path is None:
+        return None
+
+    try:
+        anthro_df = pd.read_csv(anthro_path)
+    except Exception:
+        return None
+
+    base_df = _normalize_join_columns(base_df)
+    anthro_df = _normalize_join_columns(anthro_df)
+
+    join_keys = [k for k in ['hhnum', 'member_code'] if k in base_df.columns and k in anthro_df.columns]
+    if not join_keys:
+        return None
+
+    anthro_df = anthro_df.drop_duplicates(subset=join_keys, keep='first')
+
+    overlap = [c for c in anthro_df.columns if c in base_df.columns and c not in join_keys]
+    if overlap:
+        anthro_df = anthro_df.rename(columns={c: f'{c}_anthro' for c in overlap})
+
+    merged_df = base_df.merge(anthro_df, on=join_keys, how='left')
+    out_path = PROJECT_ROOT / 'merged_clinical_dietary_anthro_leftjoin.csv'
+    merged_df.to_csv(out_path, index=False)
+
+    print(f'Prepared anthropometric-augmented dataset: {out_path}')
+    print(f'  source merged file: {base_path}')
+    print(f'  source anthropometric file: {anthro_path}')
+    print(f'  join keys: {join_keys}')
+    return out_path
+
+def resolve_data_path(candidates):
+    for c in candidates:
+        if c.exists():
+            return c
+    raise FileNotFoundError(f'No dataset found. Checked: {candidates}')
+
+def infer_target_column(df, candidates):
+    lc = {c.lower(): c for c in df.columns}
+    for t in candidates:
+        if t.lower() in lc:
+            return lc[t.lower()]
+    for c in df.columns:
+        c_lc = c.lower()
+        if any(t.lower() in c_lc for t in candidates):
+            return c
+    return None
+
+def infer_bp_columns(df):
+    sbp_aliases = ['ave_sbp', 'sbp', 'systolic', 'sysbp', 's_bp']
+    dbp_aliases = ['ave_dbp', 'dbp', 'diastolic', 'diabp', 'd_bp']
+
+    lc = {c.lower(): c for c in df.columns}
+
+    sbp_col = None
+    for a in sbp_aliases:
+        if a in lc:
+            sbp_col = lc[a]
+            break
+    if sbp_col is None:
+        for c in df.columns:
+            c_lc = c.lower()
+            if any(a in c_lc for a in sbp_aliases):
+                sbp_col = c
+                break
+
+    dbp_col = None
+    for a in dbp_aliases:
+        if a in lc:
+            dbp_col = lc[a]
+            break
+    if dbp_col is None:
+        for c in df.columns:
+            c_lc = c.lower()
+            if any(a in c_lc for a in dbp_aliases):
+                dbp_col = c
+                break
+
+    return sbp_col, dbp_col
+
+def find_first_column_case_insensitive(columns, candidates):
+    lc = {c.lower(): c for c in columns}
+    for cand in candidates:
+        cand_lc = cand.lower()
+        if cand_lc in lc:
+            return lc[cand_lc]
+    for c in columns:
+        c_lc = c.lower()
+        if any(cand.lower() in c_lc for cand in candidates):
+            return c
+    return None
+
+def to_numeric_clean(series):
+    s = pd.to_numeric(series, errors='coerce')
+    return s.where(~s.isin([9, 99, 888888, 999999]), np.nan)
+
+def build_smoking_level_feature(df_in):
+    used_cols = []
+    smoking_level_col = find_first_column_case_insensitive(df_in.columns, ['smoking_level'])
+    smoke_status_col = find_first_column_case_insensitive(df_in.columns, ['smoke_status'])
+    current_smoking_col = find_first_column_case_insensitive(df_in.columns, ['current_smoking', 'currentsmoking'])
+    ever_smoke_col = find_first_column_case_insensitive(df_in.columns, ['ever_smk'])
+
+    if smoking_level_col is not None:
+        s = to_numeric_clean(df_in[smoking_level_col]).clip(lower=0, upper=3)
+        used_cols.append(smoking_level_col)
+        return s.astype(float), sorted(set(used_cols))
+
+    idx = df_in.index
+    smoke = pd.Series(np.nan, index=idx, dtype=float)
+
+    if smoke_status_col is not None:
+        status = to_numeric_clean(df_in[smoke_status_col])
+        used_cols.append(smoke_status_col)
+        smoke.loc[status == 0] = 0
+        smoke.loc[status == 2] = 1
+        smoke.loc[status == 1] = 2
+        if current_smoking_col is not None:
+            current = to_numeric_clean(df_in[current_smoking_col])
+            used_cols.append(current_smoking_col)
+            smoke.loc[(status == 1) & (current == 3)] = 3
+        return smoke.astype(float), sorted(set(used_cols))
+
+    if current_smoking_col is not None:
+        current = to_numeric_clean(df_in[current_smoking_col])
+        used_cols.append(current_smoking_col)
+        smoke.loc[current == 0] = 0
+        smoke.loc[current.isin([1, 2])] = 2
+        smoke.loc[current == 3] = 3
+        if ever_smoke_col is not None:
+            ever = to_numeric_clean(df_in[ever_smoke_col])
+            used_cols.append(ever_smoke_col)
+            smoke.loc[(current == 0) & (ever > 0)] = 1
+        return smoke.astype(float), sorted(set(used_cols))
+
+    if ever_smoke_col is not None:
+        ever = to_numeric_clean(df_in[ever_smoke_col])
+        used_cols.append(ever_smoke_col)
+        smoke.loc[ever == 0] = 0
+        smoke.loc[ever > 0] = 1
+        return smoke.astype(float), sorted(set(used_cols))
+
+    return None, []
+
+def build_alcohol_level_feature(df_in):
+    used_cols = []
+    alcohol_level_col = find_first_column_case_insensitive(df_in.columns, ['alcohol_level'])
+    alcohol_status_col = find_first_column_case_insensitive(df_in.columns, ['alcohol_status'])
+    alcohol_ever_col = find_first_column_case_insensitive(df_in.columns, ['alcohol'])
+    current_alcohol_col = find_first_column_case_insensitive(df_in.columns, ['con_alcohol'])
+    drink30_col = find_first_column_case_insensitive(df_in.columns, ['drnk_30days'])
+    binge_col = find_first_column_case_insensitive(df_in.columns, ['binge_drink', 'binge_drinking'])
+
+    if alcohol_level_col is not None:
+        a = to_numeric_clean(df_in[alcohol_level_col]).clip(lower=0, upper=3)
+        used_cols.append(alcohol_level_col)
+        return a.astype(float), sorted(set(used_cols))
+
+    idx = df_in.index
+    alcohol = pd.Series(np.nan, index=idx, dtype=float)
+
+    if alcohol_status_col is not None:
+        status = to_numeric_clean(df_in[alcohol_status_col])
+        used_cols.append(alcohol_status_col)
+        alcohol.loc[status == 0] = 0
+        alcohol.loc[status == 2] = 1
+        alcohol.loc[status == 1] = 2
+        if binge_col is not None:
+            binge = to_numeric_clean(df_in[binge_col])
+            used_cols.append(binge_col)
+            alcohol.loc[(status == 1) & (binge == 1)] = 3
+        return alcohol.astype(float), sorted(set(used_cols))
+
+    alcohol.loc[:] = 0
+    if alcohol_ever_col is not None:
+        ever = to_numeric_clean(df_in[alcohol_ever_col])
+        used_cols.append(alcohol_ever_col)
+        alcohol.loc[ever > 0] = 1
+    if current_alcohol_col is not None:
+        current = to_numeric_clean(df_in[current_alcohol_col])
+        used_cols.append(current_alcohol_col)
+        alcohol.loc[current == 1] = np.maximum(alcohol.loc[current == 1], 2)
+    if drink30_col is not None:
+        d30 = to_numeric_clean(df_in[drink30_col])
+        used_cols.append(drink30_col)
+        alcohol.loc[d30 == 1] = np.maximum(alcohol.loc[d30 == 1], 2)
+    if binge_col is not None:
+        binge = to_numeric_clean(df_in[binge_col])
+        used_cols.append(binge_col)
+        alcohol.loc[binge == 1] = 3
+
+    if used_cols:
+        return alcohol.astype(float), sorted(set(used_cols))
+
+    return None, []
+
+def build_bmi_feature(df_in):
+    weight_col = find_first_column_case_insensitive(df_in.columns, ['weight'])
+    height_col = find_first_column_case_insensitive(df_in.columns, ['height'])
+    if weight_col is None or height_col is None:
+        return None, []
+    w = pd.to_numeric(df_in[weight_col], errors='coerce')
+    h = pd.to_numeric(df_in[height_col], errors='coerce')
+    h_m = h.copy()
+    if pd.notna(h_m.median(skipna=True)) and float(h_m.median(skipna=True)) > 3.0:
+        h_m = h_m / 100.0
+    bmi = w / (h_m ** 2)
+    bmi = bmi.replace([np.inf, -np.inf], np.nan)
+    return bmi.astype(float), [weight_col, height_col]
+
+def build_whr_feature(df_in):
+    waist_col = find_first_column_case_insensitive(df_in.columns, ['waist'])
+    hip_col = find_first_column_case_insensitive(df_in.columns, ['hip'])
+    if waist_col is None or hip_col is None:
+        return None, []
+    waist = pd.to_numeric(df_in[waist_col], errors='coerce')
+    hip = pd.to_numeric(df_in[hip_col], errors='coerce').replace(0, np.nan)
+    whr = (waist / hip).replace([np.inf, -np.inf], np.nan)
+    return whr.astype(float), [waist_col, hip_col]
+
+--- Cell 6 ---
+AUTO_MERGED_DATA_PATH = None
+for merged_candidate in [
+    PROJECT_ROOT / 'merged_clinical_dietary_leftjoin.csv',
+    PROJECT_ROOT.parent / 'merged_clinical_dietary_leftjoin.csv',
+]:
+    AUTO_MERGED_DATA_PATH = _prepare_merged_with_anthro(merged_candidate)
+    if AUTO_MERGED_DATA_PATH is not None:
+        break
+
+effective_candidates = [
+    AUTO_MERGED_DATA_PATH,
+    *DATA_CANDIDATES,
+]
+effective_candidates = [p for p in effective_candidates if p is not None]
+
+data_path = resolve_data_path(effective_candidates)
+df = pd.read_csv(data_path)
+target_col = infer_target_column(df, TARGET_CANDIDATES)
+TARGET_DEFINED_FROM_BP = False
+TARGET_SOURCE_COLUMNS = []
+
+if target_col is None:
+    sbp_col, dbp_col = infer_bp_columns(df)
+    if sbp_col is not None and dbp_col is not None:
+        sbp = pd.to_numeric(df[sbp_col], errors='coerce')
+        dbp = pd.to_numeric(df[dbp_col], errors='coerce')
+        df['Hypertension'] = (((sbp >= 130) | (dbp >= 80)).fillna(False)).astype(int)
+        target_col = 'Hypertension'
+        TARGET_DEFINED_FROM_BP = True
+        TARGET_SOURCE_COLUMNS = [sbp_col, dbp_col]
+        print(f'Target column created from: {sbp_col}, {dbp_col}')
+    else:
+        raise ValueError('Could not infer target and could not derive Hypertension from SBP/DBP (130/80 OR rule).')
+
+df = df.dropna(subset=[target_col]).copy()
+y_raw = df[target_col]
+if y_raw.nunique() != 2:
+    raise ValueError(f'Target must be binary. Found {y_raw.nunique()} classes.')
+
+if y_raw.dtype == 'O':
+    y = pd.Series(LabelEncoder().fit_transform(y_raw.astype(str)), index=y_raw.index, name=target_col)
+else:
+    y = pd.Series(y_raw.astype(int), index=y_raw.index, name=target_col)
+
+X = df.drop(columns=[target_col]).copy()
+
+smoking_feature, smoking_sources = build_smoking_level_feature(X)
+if smoking_feature is not None:
+    X['fe_smoking_level'] = smoking_feature
+
+alcohol_feature, alcohol_sources = build_alcohol_level_feature(X)
+if alcohol_feature is not None:
+    X['fe_alcohol_level'] = alcohol_feature
+
+bmi_feature, bmi_sources = build_bmi_feature(X)
+if bmi_feature is not None:
+    X['bmi'] = bmi_feature
+
+whr_feature, whr_sources = build_whr_feature(X)
+if whr_feature is not None:
+    X['whr'] = whr_feature
+
+behavior_raw_candidates = [
+    'current_smoking', 'currentsmoking', 'ever_smk', 'smoke_status', 'smoking_level',
+    'alcohol', 'con_alcohol', 'drnk_30days', 'drnk_30d_num', 'alcohol_status',
+    'binge_drink', 'binge_drinking', 'alcohol_level',
+]
+x_lc = {c.lower(): c for c in X.columns}
+behavior_drop = sorted({x_lc[c.lower()] for c in behavior_raw_candidates if c.lower() in x_lc})
+if behavior_drop:
+    X = X.drop(columns=behavior_drop, errors='ignore')
+
+anthro_source_drop = sorted({
+    c for c in set((bmi_sources or []) + (whr_sources or []))
+    if c in X.columns and c.lower() not in {'bmi', 'whr'}
+})
+if anthro_source_drop:
+    X = X.drop(columns=anthro_source_drop, errors='ignore')
+
+NON_REMOVABLE_BASE_ALIASES = ['age', 'sex']
+
+manual_non_predictive = [
+    'regcode', 'provcode', 'provhuc', 'psc', 'csc', 'rhc', 'psurec', 'strrec',
+    'wgts', 'fwgt', 'finalwgt', 'finalwgt1', 'finalwgt4',
+    'fwgth_natl_var', 'fwgth_prov', 'fwgth_natl2_var',
+    'fwgti_natl_var', 'fwgti_prov', 'fwgti_natl2_var', 'fwgti_prov2',
+    'rep_natl', 'rep_prov', 'ms_psucode', 'enns_year', 'wrkplace',
+    'interview_status', 'intdate', 'enumcode',
+    'hhnum', 'member_code',
+    'ave_sbp', 'ave_dbp', 'sbp', 'dbp', 'systolic', 'diastolic', 'sysbp', 'diabp',
+    'blood_pressure',
+    'height', 'weight', 'waist', 'hip',
+]
+x_lc = {c.lower(): c for c in X.columns}
+manual_drop = sorted({x_lc[c.lower()] for c in manual_non_predictive if c.lower() in x_lc})
+
+protected_base_cols = []
+for col in X.columns:
+    col_lc = col.lower()
+    if any(alias in col_lc for alias in NON_REMOVABLE_BASE_ALIASES):
+        protected_base_cols.append(col)
+protected_base_cols = sorted(set(protected_base_cols))
+
+if manual_drop:
+    protected_drop = [c for c in manual_drop if c in protected_base_cols]
+    if protected_drop:
+        print('Manual-drop protection triggered for non-removable base features:', protected_drop)
+    manual_drop = [c for c in manual_drop if c not in protected_base_cols]
+    X = X.drop(columns=manual_drop, errors='ignore')
+
+base_removed_non_removable = []
+for alias in NON_REMOVABLE_BASE_ALIASES:
+    if not any(alias in c.lower() for c in X.columns):
+        base_removed_non_removable.append(alias)
+
+RETRAIN_REQUIRED_NON_REMOVABLE = len(base_removed_non_removable) > 0
+
+print(f'Loaded: {data_path}')
+print(f'Auto merged dataset: {AUTO_MERGED_DATA_PATH}')
+print(f'Target: {target_col}')
+print(f'Target defined from BP fallback: {TARGET_DEFINED_FROM_BP}')
+print(f'Raw rows: {len(df)}')
+print(f'Features after manual preprocessing: {X.shape[1]}')
+print(f'Manual dropped columns: {len(manual_drop)}')
+print(f'Behavior raw dropped columns: {len(behavior_drop)}')
+print(f'Anthropometric source dropped columns: {len(anthro_source_drop)}')
+print('Protected non-removable base columns:', protected_base_cols)
+print('Missing non-removable base aliases after base preprocessing:', base_removed_non_removable)
+print('Class balance:', y.value_counts(normalize=True).to_dict())
+

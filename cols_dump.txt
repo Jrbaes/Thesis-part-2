@@ -1,0 +1,1947 @@
+﻿
+
+====== EXP3_A_KNN_RF.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+
+--- Cell 6 ---
+AUTO_MERGED_DATA_PATH = None
+for merged_candidate in [
+    PROJECT_ROOT / 'merged_clinical_dietary_leftjoin.csv',
+    PROJECT_ROOT.parent / 'merged_clinical_dietary_leftjoin.csv',
+]:
+    AUTO_MERGED_DATA_PATH = _prepare_merged_with_anthro(merged_candidate)
+    if AUTO_MERGED_DATA_PATH is not None:
+        break
+
+effective_candidates = [
+    AUTO_MERGED_DATA_PATH,
+    *DATA_CANDIDATES,
+]
+effective_candidates = [p for p in effective_candidates if p is not None]
+
+data_path = resolve_data_path(effective_candidates)
+df = pd.read_csv(data_path)
+target_col = infer_target_column(df, TARGET_CANDIDATES)
+TARGET_DEFINED_FROM_BP = False
+TARGET_SOURCE_COLUMNS = []
+
+if target_col is None:
+    sbp_col, dbp_col = infer_bp_columns(df)
+    if sbp_col is not None and dbp_col is not None:
+        sbp = pd.to_numeric(df[sbp_col], errors='coerce')
+        dbp = pd.to_numeric(df[dbp_col], errors='coerce')
+        df['Hypertension'] = (((sbp >= 130) | (dbp >= 80)).fillna(False)).astype(int)
+        target_col = 'Hypertension'
+        TARGET_DEFINED_FROM_BP = True
+        TARGET_SOURCE_COLUMNS = [sbp_col, dbp_col]
+        print(f'Target column created from: {sbp_col}, {dbp_col}')
+    else:
+        raise ValueError('Could not infer target and could not derive Hypertension from SBP/DBP (130/80 OR rule).')
+
+df = df.dropna(subset=[target_col]).copy()
+y_raw = df[target_col]
+if y_raw.nunique() != 2:
+    raise ValueError(f'Target must be binary. Found {y_raw.nunique()} classes.')
+
+if y_raw.dtype == 'O':
+    y = pd.Series(LabelEncoder().fit_transform(y_raw.astype(str)), index=y_raw.index, name=target_col)
+else:
+    y = pd.Series(y_raw.astype(int), index=y_raw.index, name=target_col)
+
+X = df.drop(columns=[target_col]).copy()
+
+smoking_feature, smoking_sources = build_smoking_level_feature(X)
+if smoking_feature is not None:
+    X['fe_smoking_level'] = smoking_feature
+
+alcohol_feature, alcohol_sources = build_alcohol_level_feature(X)
+if alcohol_feature is not None:
+    X['fe_alcohol_level'] = alcohol_feature
+
+bmi_feature, bmi_sources = build_bmi_feature(X)
+if bmi_feature is not None:
+    X['bmi'] = bmi_feature
+
+whr_feature, whr_sources = build_whr_feature(X)
+if whr_feature is not None:
+    X['whr'] = whr_feature
+
+behavior_raw_candidates = [
+    'current_smoking', 'currentsmoking', 'ever_smk', 'smoke_status', 'smoking_level',
+    'alcohol', 'con_alcohol', 'drnk_30days', 'drnk_30d_num', 'alcohol_status',
+    'binge_drink', 'binge_drinking', 'alcohol_level',
+]
+x_lc = {c.lower(): c for c in X.columns}
+behavior_drop = sorted({x_lc[c.lower()] for c in behavior_raw_candidates if c.lower() in x_lc})
+if behavior_drop:
+    X = X.drop(columns=behavior_drop, errors='ignore')
+
+anthro_source_drop = sorted({
+    c for c in set((bmi_sources or []) + (whr_sources or []))
+    if c in X.columns and c.lower() not in {'bmi', 'whr'}
+})
+if anthro_source_drop:
+    X = X.drop(columns=anthro_source_drop, errors='ignore')
+
+NON_REMOVABLE_BASE_ALIASES = ['age', 'sex']
+
+manual_non_predictive = [
+    'regcode', 'provcode', 'provhuc', 'psc', 'csc', 'rhc', 'psurec', 'strrec',
+    'wgts', 'fwgt', 'finalwgt', 'finalwgt1', 'finalwgt4',
+    'fwgth_natl_var', 'fwgth_prov', 'fwgth_natl2_var',
+    'fwgti_natl_var', 'fwgti_prov', 'fwgti_natl2_var', 'fwgti_prov2',
+    'rep_natl', 'rep_prov', 'ms_psucode', 'enns_year', 'wrkplace',
+    'interview_status', 'intdate', 'enumcode',
+    'hhnum', 'member_code',
+    'ave_sbp', 'ave_dbp', 'sbp', 'dbp', 'systolic', 'diastolic', 'sysbp', 'diabp',
+    'blood_pressure',
+    'height', 'weight', 'waist', 'hip',
+]
+x_lc = {c.lower(): c for c in X.columns}
+manual_drop = sorted({x_lc[c.lower()] for c in manual_non_predictive if c.lower() in x_lc})
+
+protected_base_cols = []
+for col in X.columns:
+    col_lc = col.lower()
+    if any(alias in col_lc for alias in NON_REMOVABLE_BASE_ALIASES):
+        protected_base_cols.append(col)
+protected_base_cols = sorted(set(protected_base_cols))
+
+if manual_drop:
+    protected_drop = [c for c in manual_drop if c in protected_base_cols]
+    if protected_drop:
+        print('Manual-drop protection triggered for non-removable base features:', protected_drop)
+    manual_drop = [c for c in manual_drop if c not in protected_base_cols]
+    X = X.drop(columns=manual_drop, errors='ignore')
+
+base_removed_non_removable = []
+for alias in NON_REMOVABLE_BASE_ALIASES:
+    if not any(alias in c.lower() for c in X.columns):
+        base_removed_non_removable.append(alias)
+
+RETRAIN_REQUIRED_NON_REMOVABLE = len(base_removed_non_removable) > 0
+
+print(f'Loaded: {data_path}')
+print(f'Auto merged dataset: {AUTO_MERGED_DATA_PATH}')
+print(f'Target: {target_col}')
+print(f'Target defined from BP fallback: {TARGET_DEFINED_FROM_BP}')
+print(f'Raw rows: {len(df)}')
+print(f'Features after manual preprocessing: {X.shape[1]}')
+print(f'Manual dropped columns: {len(manual_drop)}')
+print(f'Behavior raw dropped columns: {len(behavior_drop)}')
+print(f'Anthropometric source dropped columns: {len(anthro_source_drop)}')
+print('Protected non-removable base columns:', protected_base_cols)
+print('Missing non-removable base aliases after base preprocessing:', base_removed_non_removable)
+print('Class balance:', y.value_counts(normalize=True).to_dict())
+
+--- Cell 7 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Imports & Setup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Inherits: PROJECT_ROOT, X, y ΓÇö defined by earlier cells in this notebook.
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from pathlib import Path
+from copy import deepcopy
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import (
+    accuracy_score, recall_score, precision_score,
+    f1_score, roc_auc_score, log_loss, make_scorer,
+)
+from sklearn.calibration import CalibratedClassifierCV
+
+from imblearn.over_sampling import SMOTE, SMOTENC
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from venn_abers import VennAbers
+import shap
+import lime.lime_tabular
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 60)
+pd.set_option('display.float_format', '{:.4f}'.format)
+
+E3_SEED = 42
+np.random.seed(E3_SEED)
+
+E3_DIR = PROJECT_ROOT / 'exp3_knn_rf'
+(E3_DIR / 'models').mkdir(parents=True, exist_ok=True)
+(E3_DIR / 'plots').mkdir(parents=True, exist_ok=True)
+
+SAMPLING_METHODS = ['base', 'smote', 'smotenc', 'cw', 'smotecw', 'smotencw']
+MODEL_NAMES      = ['knn', 'randomforest']
+CAL_METHODS      = ['base', 'platt', 'isotonic', 'venn_abers']
+CW_SAMPLINGS     = {'cw', 'smotecw', 'smotencw'}   # variants that activate class-weight
+
+# RandomizedSearchCV iterations per model (slower models get fewer)
+N_ITER_MAP = {
+    'logreg': 10, 'knn': 10, 'adaboost': 10,
+    'catboost': 5, 'xgboost': 5, 'randomforest': 10,
+}
+
+SEARCH_SPACES = {
+    'logreg': {
+        'C': [0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0],
+    },
+    'knn': {
+        'n_neighbors': [3, 5, 7, 9, 11, 15, 21],
+        'weights':     ['uniform', 'distance'],
+    },
+    'adaboost': {
+        'n_estimators': [50, 100, 200, 300],
+        'learning_rate': [0.01, 0.05, 0.1, 0.5, 1.0],
+    },
+    'catboost': {
+        'depth':         [4, 6, 8],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'iterations':    [100, 200, 300],
+    },
+    'xgboost': {
+        'max_depth':     [3, 5, 7],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'n_estimators':  [100, 200, 300],
+    },
+    'randomforest': {
+        'n_estimators':    [100, 200, 300],
+        'max_depth':       [None, 5, 10, 15],
+        'min_samples_leaf': [1, 2, 5],
+    },
+}
+
+print("EXP3 setup complete.")
+print("Artifact directory:", E3_DIR)
+
+
+--- Cell 8 ---
+# ΓöÇΓöÇ EXP3 ┬╖ 3-Way Split + Column Detection ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# 60 % Train | 20 % Calibration | 20 % Test  (stratified)
+
+X_e3_tr, X_e3_tmp, y_e3_tr, y_e3_tmp = train_test_split(
+    X, y, test_size=0.40, random_state=E3_SEED, stratify=y
+)
+X_e3_cal, X_e3_te, y_e3_cal, y_e3_te = train_test_split(
+    X_e3_tmp, y_e3_tmp, test_size=0.50, random_state=E3_SEED, stratify=y_e3_tmp
+)
+
+y_e3_tr  = np.asarray(y_e3_tr,  dtype=int)
+y_e3_cal = np.asarray(y_e3_cal, dtype=int)
+y_e3_te  = np.asarray(y_e3_te,  dtype=int)
+
+# Column types detected on training set
+e3_num_cols = X_e3_tr.select_dtypes(include=[np.number]).columns.tolist()
+e3_cat_cols = [c for c in X_e3_tr.columns if c not in e3_num_cols]
+
+print(pd.DataFrame({
+    'Split': ['Train', 'Cal', 'Test'],
+    'N':     [len(y_e3_tr), len(y_e3_cal), len(y_e3_te)],
+    'Pos %': [f"{y_e3_tr.mean()*100:.1f}", f"{y_e3_cal.mean()*100:.1f}", f"{y_e3_te.mean()*100:.1f}"],
+}).to_string(index=False))
+print(f"\nNumeric features : {len(e3_num_cols)}")
+print(f"Categorical      : {len(e3_cat_cols)}")
+
+
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
+
+--- Cell 10 ---
+# ΓöÇΓöÇ EXP3_A_KNN_RF ┬╖ KNN Imputation + Collinearity Filter + Scale/OHE Fit ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+from sklearn.model_selection import ParameterSampler
+
+e3_knn_imp, e3_cat_imp = e3_fit_imputers(X_e3_tr, e3_num_cols, e3_cat_cols)
+
+X_e3_tr_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_tr,  e3_num_cols, e3_cat_cols)
+X_e3_cal_imp = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_cal, e3_num_cols, e3_cat_cols)
+X_e3_te_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_te,  e3_num_cols, e3_cat_cols)
+
+# ΓöÇΓöÇ Collinearity filter (cutoff = COLLINEARITY_CUTOFF, mirrors original experiment) ΓöÇΓöÇ
+# Protects age, sex, bmi, whr from ever being dropped.
+_e3_protected = sorted({
+    c for c in e3_num_cols
+    if any(a in c.lower() for a in ['age', 'sex', 'bmi', 'whr'])
+})
+_e3_corr  = X_e3_tr_imp[e3_num_cols].corr().abs()
+_e3_upper = _e3_corr.where(np.triu(np.ones(_e3_corr.shape), k=1).astype(bool))
+_e3_drop  = [
+    c for c in _e3_upper.columns
+    if c not in _e3_protected and (_e3_upper[c] > COLLINEARITY_CUTOFF).any()
+]
+e3_num_cols  = [c for c in e3_num_cols if c not in _e3_drop]   # updated globally
+_e3_all_keep = e3_num_cols + e3_cat_cols
+X_e3_tr_imp  = X_e3_tr_imp[_e3_all_keep]
+X_e3_cal_imp = X_e3_cal_imp[_e3_all_keep]
+X_e3_te_imp  = X_e3_te_imp[_e3_all_keep]
+print(f"Collinearity filter (cutoff={COLLINEARITY_CUTOFF}): "
+      f"dropped {len(_e3_drop)} ΓåÆ kept {len(e3_num_cols)} numeric features")
+if _e3_drop:
+    print("  Dropped:", _e3_drop)
+if _e3_protected:
+    print("  Protected:", _e3_protected)
+
+
+# Scaler + OHE fitted on original (un-resampled) training data
+e3_scaler, e3_ohe, e3_feat_names = e3_fit_enc_scaler(X_e3_tr_imp, e3_num_cols, e3_cat_cols)
+
+# Cal / test are never resampled
+X_e3_cal_proc = e3_encode_scale(e3_scaler, e3_ohe, X_e3_cal_imp, e3_num_cols, e3_cat_cols)
+X_e3_te_proc  = e3_encode_scale(e3_scaler, e3_ohe, X_e3_te_imp,  e3_num_cols, e3_cat_cols)
+
+print(f"Cal : {X_e3_cal_proc.shape}  |  Test: {X_e3_te_proc.shape}  |  Features: {len(e3_feat_names)}")
+
+# ΓöÇΓöÇ 2-Stage Optimization Config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Reduce E3_S1_TRIALS / E3_S2_REFINE for faster runs (lower quality).
+# Increase for publication-quality results.
+
+E3_S1_TRIALS    = 15    # random param trials per (model, sampling) ΓÇö Stage 1
+E3_S1_EPOCHS    = 80    # tree iterations during Stage-1 CV
+E3_S1_FOLDS     = 2     # CV folds in Stage 1
+E3_TOP_K_S1     = 5     # top configs carried forward to Stage 2
+
+E3_S2_REFINE    = 2     # local perturbations per top config ΓÇö Stage 2
+E3_S2_EPOCHS    = 200   # tree iterations during Stage-2 CV
+E3_S2_FOLDS     = 3     # CV folds in Stage 2
+E3_TOP_K_S2     = 2     # best Stage-2 configs used for final training
+
+E3_FINAL_EPOCHS = 400   # tree iterations for the final (full-train) model
+THRESHOLD_GRID  = np.round(np.arange(0.35, 0.70, 0.05), 2)
+
+# ΓöÇΓöÇ Parameter search spaces ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+E3_MODEL_SPACES = {
+    'logreg': {
+        'C':      loguniform(1e-4, 1e2),
+        'solver': ['lbfgs', 'liblinear'],
+    },
+    'knn': {
+        'n_neighbors': randint(3, 31),
+        'weights':     ['uniform', 'distance'],
+        'metric':      ['euclidean', 'manhattan'],
+    },
+    'adaboost': {
+        'n_estimators': randint(50, 300),
+        'learning_rate': uniform(0.01, 0.49),
+        'base_depth':    randint(1, 5),
+    },
+    'catboost': {
+        'learning_rate':   loguniform(0.01, 0.30),
+        'depth':           randint(4, 10),
+        'l2_leaf_reg':     uniform(1.0, 9.0),
+        'random_strength': uniform(0.1, 1.9),
+    },
+    'xgboost': {
+        'learning_rate':    loguniform(0.01, 0.30),
+        'max_depth':        randint(3, 9),
+        'subsample':        uniform(0.6, 0.4),
+        'colsample_bytree': uniform(0.6, 0.4),
+        'min_child_weight': randint(1, 7),
+        'gamma':            uniform(0.0, 0.5),
+        'reg_lambda':       loguniform(1e-2, 10),
+    },
+    'randomforest': {
+        'max_features':      uniform(0.2, 0.8),
+        'min_samples_split': randint(2, 20),
+        'min_samples_leaf':  randint(1, 10),
+        'max_depth':         [None, 10, 20, 30],
+    },
+}
+
+_n_s2_cands = E3_TOP_K_S1 * (E3_S2_REFINE + 1)
+print(f"\nStage 1 : {E3_S1_TRIALS} trials ├ù {E3_S1_FOLDS} folds, top-{E3_TOP_K_S1} kept")
+print(f"Stage 2 : ~{_n_s2_cands} candidates ├ù {E3_S2_FOLDS} folds, top-{E3_TOP_K_S2} for final")
+print(f"Final   : {E3_FINAL_EPOCHS} epochs, threshold swept on Cal set")
+print(f"Total   : {len(SAMPLING_METHODS)} samplings ├ù {len(MODEL_NAMES)} models = {len(SAMPLING_METHODS)*len(MODEL_NAMES)} combos")
+
+# ΓöÇΓöÇ 2-Stage Optimization + Final Training Loop ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+e3_stage1_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-1 trial results
+e3_stage2_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-2 trial results
+e3_best_configs   = {}    # (sampling, model) ΓåÆ list of best Stage-2 params dicts
+e3_results        = []    # pre-calibration test metrics
+e3_models         = {}    # (sampling, model) ΓåÆ fitted final model
+e3_tr_data        = {}    # (sampling, model) ΓåÆ (X_tr_proc, y_tr_proc)
+
+for sampling in SAMPLING_METHODS:
+    use_cw = sampling in CW_SAMPLINGS
+    print(f"\n{'ΓòÉ'*68}")
+    print(f"Sampling: {sampling:12s}  |  class-weight active: {use_cw}")
+    print(f"{'ΓòÉ'*68}")
+
+    for model_name in MODEL_NAMES:
+        key = (sampling, model_name)
+
+        # ΓöÇΓöÇ Stage 1: broad random search ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        trials = list(ParameterSampler(
+            E3_MODEL_SPACES[model_name], n_iter=E3_S1_TRIALS, random_state=E3_SEED))
+        s1_rows = []
+        for i, params in enumerate(trials, start=1):
+            try:
+                cv_met = e3_evaluate_params_cv(
+                    model_name, params, sampling,
+                    X_e3_tr_imp, y_e3_tr,
+                    E3_S1_EPOCHS, E3_S1_FOLDS, seed=E3_SEED)
+                s1_rows.append({'trial': i, 'params': params, **cv_met})
+            except Exception as exc:
+                s1_rows.append({'trial': i, 'params': params,
+   
+
+
+
+====== EXP3_B_XGB_AdaBoost.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+
+--- Cell 6 ---
+AUTO_MERGED_DATA_PATH = None
+for merged_candidate in [
+    PROJECT_ROOT / 'merged_clinical_dietary_leftjoin.csv',
+    PROJECT_ROOT.parent / 'merged_clinical_dietary_leftjoin.csv',
+]:
+    AUTO_MERGED_DATA_PATH = _prepare_merged_with_anthro(merged_candidate)
+    if AUTO_MERGED_DATA_PATH is not None:
+        break
+
+effective_candidates = [
+    AUTO_MERGED_DATA_PATH,
+    *DATA_CANDIDATES,
+]
+effective_candidates = [p for p in effective_candidates if p is not None]
+
+data_path = resolve_data_path(effective_candidates)
+df = pd.read_csv(data_path)
+target_col = infer_target_column(df, TARGET_CANDIDATES)
+TARGET_DEFINED_FROM_BP = False
+TARGET_SOURCE_COLUMNS = []
+
+if target_col is None:
+    sbp_col, dbp_col = infer_bp_columns(df)
+    if sbp_col is not None and dbp_col is not None:
+        sbp = pd.to_numeric(df[sbp_col], errors='coerce')
+        dbp = pd.to_numeric(df[dbp_col], errors='coerce')
+        df['Hypertension'] = (((sbp >= 130) | (dbp >= 80)).fillna(False)).astype(int)
+        target_col = 'Hypertension'
+        TARGET_DEFINED_FROM_BP = True
+        TARGET_SOURCE_COLUMNS = [sbp_col, dbp_col]
+        print(f'Target column created from: {sbp_col}, {dbp_col}')
+    else:
+        raise ValueError('Could not infer target and could not derive Hypertension from SBP/DBP (130/80 OR rule).')
+
+df = df.dropna(subset=[target_col]).copy()
+y_raw = df[target_col]
+if y_raw.nunique() != 2:
+    raise ValueError(f'Target must be binary. Found {y_raw.nunique()} classes.')
+
+if y_raw.dtype == 'O':
+    y = pd.Series(LabelEncoder().fit_transform(y_raw.astype(str)), index=y_raw.index, name=target_col)
+else:
+    y = pd.Series(y_raw.astype(int), index=y_raw.index, name=target_col)
+
+X = df.drop(columns=[target_col]).copy()
+
+smoking_feature, smoking_sources = build_smoking_level_feature(X)
+if smoking_feature is not None:
+    X['fe_smoking_level'] = smoking_feature
+
+alcohol_feature, alcohol_sources = build_alcohol_level_feature(X)
+if alcohol_feature is not None:
+    X['fe_alcohol_level'] = alcohol_feature
+
+bmi_feature, bmi_sources = build_bmi_feature(X)
+if bmi_feature is not None:
+    X['bmi'] = bmi_feature
+
+whr_feature, whr_sources = build_whr_feature(X)
+if whr_feature is not None:
+    X['whr'] = whr_feature
+
+behavior_raw_candidates = [
+    'current_smoking', 'currentsmoking', 'ever_smk', 'smoke_status', 'smoking_level',
+    'alcohol', 'con_alcohol', 'drnk_30days', 'drnk_30d_num', 'alcohol_status',
+    'binge_drink', 'binge_drinking', 'alcohol_level',
+]
+x_lc = {c.lower(): c for c in X.columns}
+behavior_drop = sorted({x_lc[c.lower()] for c in behavior_raw_candidates if c.lower() in x_lc})
+if behavior_drop:
+    X = X.drop(columns=behavior_drop, errors='ignore')
+
+anthro_source_drop = sorted({
+    c for c in set((bmi_sources or []) + (whr_sources or []))
+    if c in X.columns and c.lower() not in {'bmi', 'whr'}
+})
+if anthro_source_drop:
+    X = X.drop(columns=anthro_source_drop, errors='ignore')
+
+NON_REMOVABLE_BASE_ALIASES = ['age', 'sex']
+
+manual_non_predictive = [
+    'regcode', 'provcode', 'provhuc', 'psc', 'csc', 'rhc', 'psurec', 'strrec',
+    'wgts', 'fwgt', 'finalwgt', 'finalwgt1', 'finalwgt4',
+    'fwgth_natl_var', 'fwgth_prov', 'fwgth_natl2_var',
+    'fwgti_natl_var', 'fwgti_prov', 'fwgti_natl2_var', 'fwgti_prov2',
+    'rep_natl', 'rep_prov', 'ms_psucode', 'enns_year', 'wrkplace',
+    'interview_status', 'intdate', 'enumcode',
+    'hhnum', 'member_code',
+    'ave_sbp', 'ave_dbp', 'sbp', 'dbp', 'systolic', 'diastolic', 'sysbp', 'diabp',
+    'blood_pressure',
+    'height', 'weight', 'waist', 'hip',
+]
+x_lc = {c.lower(): c for c in X.columns}
+manual_drop = sorted({x_lc[c.lower()] for c in manual_non_predictive if c.lower() in x_lc})
+
+protected_base_cols = []
+for col in X.columns:
+    col_lc = col.lower()
+    if any(alias in col_lc for alias in NON_REMOVABLE_BASE_ALIASES):
+        protected_base_cols.append(col)
+protected_base_cols = sorted(set(protected_base_cols))
+
+if manual_drop:
+    protected_drop = [c for c in manual_drop if c in protected_base_cols]
+    if protected_drop:
+        print('Manual-drop protection triggered for non-removable base features:', protected_drop)
+    manual_drop = [c for c in manual_drop if c not in protected_base_cols]
+    X = X.drop(columns=manual_drop, errors='ignore')
+
+base_removed_non_removable = []
+for alias in NON_REMOVABLE_BASE_ALIASES:
+    if not any(alias in c.lower() for c in X.columns):
+        base_removed_non_removable.append(alias)
+
+RETRAIN_REQUIRED_NON_REMOVABLE = len(base_removed_non_removable) > 0
+
+print(f'Loaded: {data_path}')
+print(f'Auto merged dataset: {AUTO_MERGED_DATA_PATH}')
+print(f'Target: {target_col}')
+print(f'Target defined from BP fallback: {TARGET_DEFINED_FROM_BP}')
+print(f'Raw rows: {len(df)}')
+print(f'Features after manual preprocessing: {X.shape[1]}')
+print(f'Manual dropped columns: {len(manual_drop)}')
+print(f'Behavior raw dropped columns: {len(behavior_drop)}')
+print(f'Anthropometric source dropped columns: {len(anthro_source_drop)}')
+print('Protected non-removable base columns:', protected_base_cols)
+print('Missing non-removable base aliases after base preprocessing:', base_removed_non_removable)
+print('Class balance:', y.value_counts(normalize=True).to_dict())
+
+--- Cell 7 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Imports & Setup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Inherits: PROJECT_ROOT, X, y ΓÇö defined by earlier cells in this notebook.
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from pathlib import Path
+from copy import deepcopy
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import (
+    accuracy_score, recall_score, precision_score,
+    f1_score, roc_auc_score, log_loss, make_scorer,
+)
+from sklearn.calibration import CalibratedClassifierCV
+
+from imblearn.over_sampling import SMOTE, SMOTENC
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from venn_abers import VennAbers
+import shap
+import lime.lime_tabular
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 60)
+pd.set_option('display.float_format', '{:.4f}'.format)
+
+E3_SEED = 42
+np.random.seed(E3_SEED)
+
+E3_DIR = PROJECT_ROOT / 'exp3_xgb_ada'
+(E3_DIR / 'models').mkdir(parents=True, exist_ok=True)
+(E3_DIR / 'plots').mkdir(parents=True, exist_ok=True)
+
+SAMPLING_METHODS = ['base', 'smote', 'smotenc', 'cw', 'smotecw', 'smotencw']
+MODEL_NAMES      = ['xgboost', 'adaboost']
+CAL_METHODS      = ['base', 'platt', 'isotonic', 'venn_abers']
+CW_SAMPLINGS     = {'cw', 'smotecw', 'smotencw'}   # variants that activate class-weight
+
+# RandomizedSearchCV iterations per model (slower models get fewer)
+N_ITER_MAP = {
+    'logreg': 10, 'knn': 10, 'adaboost': 10,
+    'catboost': 5, 'xgboost': 5, 'randomforest': 10,
+}
+
+SEARCH_SPACES = {
+    'logreg': {
+        'C': [0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0],
+    },
+    'knn': {
+        'n_neighbors': [3, 5, 7, 9, 11, 15, 21],
+        'weights':     ['uniform', 'distance'],
+    },
+    'adaboost': {
+        'n_estimators': [50, 100, 200, 300],
+        'learning_rate': [0.01, 0.05, 0.1, 0.5, 1.0],
+    },
+    'catboost': {
+        'depth':         [4, 6, 8],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'iterations':    [100, 200, 300],
+    },
+    'xgboost': {
+        'max_depth':     [3, 5, 7],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'n_estimators':  [100, 200, 300],
+    },
+    'randomforest': {
+        'n_estimators':    [100, 200, 300],
+        'max_depth':       [None, 5, 10, 15],
+        'min_samples_leaf': [1, 2, 5],
+    },
+}
+
+print("EXP3 setup complete.")
+print("Artifact directory:", E3_DIR)
+
+
+--- Cell 8 ---
+# ΓöÇΓöÇ EXP3 ┬╖ 3-Way Split + Column Detection ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# 60 % Train | 20 % Calibration | 20 % Test  (stratified)
+
+X_e3_tr, X_e3_tmp, y_e3_tr, y_e3_tmp = train_test_split(
+    X, y, test_size=0.40, random_state=E3_SEED, stratify=y
+)
+X_e3_cal, X_e3_te, y_e3_cal, y_e3_te = train_test_split(
+    X_e3_tmp, y_e3_tmp, test_size=0.50, random_state=E3_SEED, stratify=y_e3_tmp
+)
+
+y_e3_tr  = np.asarray(y_e3_tr,  dtype=int)
+y_e3_cal = np.asarray(y_e3_cal, dtype=int)
+y_e3_te  = np.asarray(y_e3_te,  dtype=int)
+
+# Column types detected on training set
+e3_num_cols = X_e3_tr.select_dtypes(include=[np.number]).columns.tolist()
+e3_cat_cols = [c for c in X_e3_tr.columns if c not in e3_num_cols]
+
+print(pd.DataFrame({
+    'Split': ['Train', 'Cal', 'Test'],
+    'N':     [len(y_e3_tr), len(y_e3_cal), len(y_e3_te)],
+    'Pos %': [f"{y_e3_tr.mean()*100:.1f}", f"{y_e3_cal.mean()*100:.1f}", f"{y_e3_te.mean()*100:.1f}"],
+}).to_string(index=False))
+print(f"\nNumeric features : {len(e3_num_cols)}")
+print(f"Categorical      : {len(e3_cat_cols)}")
+
+
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
+
+--- Cell 10 ---
+# ΓöÇΓöÇ EXP3_B_XGB_AdaBoost ┬╖ KNN Imputation + Collinearity Filter + Scale/OHE Fit ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+from sklearn.model_selection import ParameterSampler
+
+e3_knn_imp, e3_cat_imp = e3_fit_imputers(X_e3_tr, e3_num_cols, e3_cat_cols)
+
+X_e3_tr_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_tr,  e3_num_cols, e3_cat_cols)
+X_e3_cal_imp = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_cal, e3_num_cols, e3_cat_cols)
+X_e3_te_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_te,  e3_num_cols, e3_cat_cols)
+
+# ΓöÇΓöÇ Collinearity filter (cutoff = COLLINEARITY_CUTOFF, mirrors original experiment) ΓöÇΓöÇ
+# Protects age, sex, bmi, whr from ever being dropped.
+_e3_protected = sorted({
+    c for c in e3_num_cols
+    if any(a in c.lower() for a in ['age', 'sex', 'bmi', 'whr'])
+})
+_e3_corr  = X_e3_tr_imp[e3_num_cols].corr().abs()
+_e3_upper = _e3_corr.where(np.triu(np.ones(_e3_corr.shape), k=1).astype(bool))
+_e3_drop  = [
+    c for c in _e3_upper.columns
+    if c not in _e3_protected and (_e3_upper[c] > COLLINEARITY_CUTOFF).any()
+]
+e3_num_cols  = [c for c in e3_num_cols if c not in _e3_drop]   # updated globally
+_e3_all_keep = e3_num_cols + e3_cat_cols
+X_e3_tr_imp  = X_e3_tr_imp[_e3_all_keep]
+X_e3_cal_imp = X_e3_cal_imp[_e3_all_keep]
+X_e3_te_imp  = X_e3_te_imp[_e3_all_keep]
+print(f"Collinearity filter (cutoff={COLLINEARITY_CUTOFF}): "
+      f"dropped {len(_e3_drop)} ΓåÆ kept {len(e3_num_cols)} numeric features")
+if _e3_drop:
+    print("  Dropped:", _e3_drop)
+if _e3_protected:
+    print("  Protected:", _e3_protected)
+
+
+# Scaler + OHE fitted on original (un-resampled) training data
+e3_scaler, e3_ohe, e3_feat_names = e3_fit_enc_scaler(X_e3_tr_imp, e3_num_cols, e3_cat_cols)
+
+# Cal / test are never resampled
+X_e3_cal_proc = e3_encode_scale(e3_scaler, e3_ohe, X_e3_cal_imp, e3_num_cols, e3_cat_cols)
+X_e3_te_proc  = e3_encode_scale(e3_scaler, e3_ohe, X_e3_te_imp,  e3_num_cols, e3_cat_cols)
+
+print(f"Cal : {X_e3_cal_proc.shape}  |  Test: {X_e3_te_proc.shape}  |  Features: {len(e3_feat_names)}")
+
+# ΓöÇΓöÇ 2-Stage Optimization Config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Reduce E3_S1_TRIALS / E3_S2_REFINE for faster runs (lower quality).
+# Increase for publication-quality results.
+
+E3_S1_TRIALS    = 15    # random param trials per (model, sampling) ΓÇö Stage 1
+E3_S1_EPOCHS    = 80    # tree iterations during Stage-1 CV
+E3_S1_FOLDS     = 2     # CV folds in Stage 1
+E3_TOP_K_S1     = 5     # top configs carried forward to Stage 2
+
+E3_S2_REFINE    = 2     # local perturbations per top config ΓÇö Stage 2
+E3_S2_EPOCHS    = 200   # tree iterations during Stage-2 CV
+E3_S2_FOLDS     = 3     # CV folds in Stage 2
+E3_TOP_K_S2     = 2     # best Stage-2 configs used for final training
+
+E3_FINAL_EPOCHS = 400   # tree iterations for the final (full-train) model
+THRESHOLD_GRID  = np.round(np.arange(0.35, 0.70, 0.05), 2)
+
+# ΓöÇΓöÇ Parameter search spaces ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+E3_MODEL_SPACES = {
+    'logreg': {
+        'C':      loguniform(1e-4, 1e2),
+        'solver': ['lbfgs', 'liblinear'],
+    },
+    'knn': {
+        'n_neighbors': randint(3, 31),
+        'weights':     ['uniform', 'distance'],
+        'metric':      ['euclidean', 'manhattan'],
+    },
+    'adaboost': {
+        'n_estimators': randint(50, 300),
+        'learning_rate': uniform(0.01, 0.49),
+        'base_depth':    randint(1, 5),
+    },
+    'catboost': {
+        'learning_rate':   loguniform(0.01, 0.30),
+        'depth':           randint(4, 10),
+        'l2_leaf_reg':     uniform(1.0, 9.0),
+        'random_strength': uniform(0.1, 1.9),
+    },
+    'xgboost': {
+        'learning_rate':    loguniform(0.01, 0.30),
+        'max_depth':        randint(3, 9),
+        'subsample':        uniform(0.6, 0.4),
+        'colsample_bytree': uniform(0.6, 0.4),
+        'min_child_weight': randint(1, 7),
+        'gamma':            uniform(0.0, 0.5),
+        'reg_lambda':       loguniform(1e-2, 10),
+    },
+    'randomforest': {
+        'max_features':      uniform(0.2, 0.8),
+        'min_samples_split': randint(2, 20),
+        'min_samples_leaf':  randint(1, 10),
+        'max_depth':         [None, 10, 20, 30],
+    },
+}
+
+_n_s2_cands = E3_TOP_K_S1 * (E3_S2_REFINE + 1)
+print(f"\nStage 1 : {E3_S1_TRIALS} trials ├ù {E3_S1_FOLDS} folds, top-{E3_TOP_K_S1} kept")
+print(f"Stage 2 : ~{_n_s2_cands} candidates ├ù {E3_S2_FOLDS} folds, top-{E3_TOP_K_S2} for final")
+print(f"Final   : {E3_FINAL_EPOCHS} epochs, threshold swept on Cal set")
+print(f"Total   : {len(SAMPLING_METHODS)} samplings ├ù {len(MODEL_NAMES)} models = {len(SAMPLING_METHODS)*len(MODEL_NAMES)} combos")
+
+# ΓöÇΓöÇ 2-Stage Optimization + Final Training Loop ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+e3_stage1_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-1 trial results
+e3_stage2_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-2 trial results
+e3_best_configs   = {}    # (sampling, model) ΓåÆ list of best Stage-2 params dicts
+e3_results        = []    # pre-calibration test metrics
+e3_models         = {}    # (sampling, model) ΓåÆ fitted final model
+e3_tr_data        = {}    # (sampling, model) ΓåÆ (X_tr_proc, y_tr_proc)
+
+for sampling in SAMPLING_METHODS:
+    use_cw = sampling in CW_SAMPLINGS
+    print(f"\n{'ΓòÉ'*68}")
+    print(f"Sampling: {sampling:12s}  |  class-weight active: {use_cw}")
+    print(f"{'ΓòÉ'*68}")
+
+    for model_name in MODEL_NAMES:
+        key = (sampling, model_name)
+
+        # ΓöÇΓöÇ Stage 1: broad random search ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        trials = list(ParameterSampler(
+            E3_MODEL_SPACES[model_name], n_iter=E3_S1_TRIALS, random_state=E3_SEED))
+        s1_rows = []
+        for i, params in enumerate(trials, start=1):
+            try:
+                cv_met = e3_evaluate_params_cv(
+                    model_name, params, sampling,
+                    X_e3_tr_imp, y_e3_tr,
+                    E3_S1_EPOCHS, E3_S1_FOLDS, seed=E3_SEED)
+                s1_rows.append({'trial': i, 'params': params, **cv_met})
+            except Exception as exc:
+                s1_rows.append({'trial': i, 'params': param
+
+
+
+====== EXP3_C_LogReg_CatBoost.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+
+--- Cell 6 ---
+AUTO_MERGED_DATA_PATH = None
+for merged_candidate in [
+    PROJECT_ROOT / 'merged_clinical_dietary_leftjoin.csv',
+    PROJECT_ROOT.parent / 'merged_clinical_dietary_leftjoin.csv',
+]:
+    AUTO_MERGED_DATA_PATH = _prepare_merged_with_anthro(merged_candidate)
+    if AUTO_MERGED_DATA_PATH is not None:
+        break
+
+effective_candidates = [
+    AUTO_MERGED_DATA_PATH,
+    *DATA_CANDIDATES,
+]
+effective_candidates = [p for p in effective_candidates if p is not None]
+
+data_path = resolve_data_path(effective_candidates)
+df = pd.read_csv(data_path)
+target_col = infer_target_column(df, TARGET_CANDIDATES)
+TARGET_DEFINED_FROM_BP = False
+TARGET_SOURCE_COLUMNS = []
+
+if target_col is None:
+    sbp_col, dbp_col = infer_bp_columns(df)
+    if sbp_col is not None and dbp_col is not None:
+        sbp = pd.to_numeric(df[sbp_col], errors='coerce')
+        dbp = pd.to_numeric(df[dbp_col], errors='coerce')
+        df['Hypertension'] = (((sbp >= 130) | (dbp >= 80)).fillna(False)).astype(int)
+        target_col = 'Hypertension'
+        TARGET_DEFINED_FROM_BP = True
+        TARGET_SOURCE_COLUMNS = [sbp_col, dbp_col]
+        print(f'Target column created from: {sbp_col}, {dbp_col}')
+    else:
+        raise ValueError('Could not infer target and could not derive Hypertension from SBP/DBP (130/80 OR rule).')
+
+df = df.dropna(subset=[target_col]).copy()
+y_raw = df[target_col]
+if y_raw.nunique() != 2:
+    raise ValueError(f'Target must be binary. Found {y_raw.nunique()} classes.')
+
+if y_raw.dtype == 'O':
+    y = pd.Series(LabelEncoder().fit_transform(y_raw.astype(str)), index=y_raw.index, name=target_col)
+else:
+    y = pd.Series(y_raw.astype(int), index=y_raw.index, name=target_col)
+
+X = df.drop(columns=[target_col]).copy()
+
+smoking_feature, smoking_sources = build_smoking_level_feature(X)
+if smoking_feature is not None:
+    X['fe_smoking_level'] = smoking_feature
+
+alcohol_feature, alcohol_sources = build_alcohol_level_feature(X)
+if alcohol_feature is not None:
+    X['fe_alcohol_level'] = alcohol_feature
+
+bmi_feature, bmi_sources = build_bmi_feature(X)
+if bmi_feature is not None:
+    X['bmi'] = bmi_feature
+
+whr_feature, whr_sources = build_whr_feature(X)
+if whr_feature is not None:
+    X['whr'] = whr_feature
+
+behavior_raw_candidates = [
+    'current_smoking', 'currentsmoking', 'ever_smk', 'smoke_status', 'smoking_level',
+    'alcohol', 'con_alcohol', 'drnk_30days', 'drnk_30d_num', 'alcohol_status',
+    'binge_drink', 'binge_drinking', 'alcohol_level',
+]
+x_lc = {c.lower(): c for c in X.columns}
+behavior_drop = sorted({x_lc[c.lower()] for c in behavior_raw_candidates if c.lower() in x_lc})
+if behavior_drop:
+    X = X.drop(columns=behavior_drop, errors='ignore')
+
+anthro_source_drop = sorted({
+    c for c in set((bmi_sources or []) + (whr_sources or []))
+    if c in X.columns and c.lower() not in {'bmi', 'whr'}
+})
+if anthro_source_drop:
+    X = X.drop(columns=anthro_source_drop, errors='ignore')
+
+NON_REMOVABLE_BASE_ALIASES = ['age', 'sex']
+
+manual_non_predictive = [
+    'regcode', 'provcode', 'provhuc', 'psc', 'csc', 'rhc', 'psurec', 'strrec',
+    'wgts', 'fwgt', 'finalwgt', 'finalwgt1', 'finalwgt4',
+    'fwgth_natl_var', 'fwgth_prov', 'fwgth_natl2_var',
+    'fwgti_natl_var', 'fwgti_prov', 'fwgti_natl2_var', 'fwgti_prov2',
+    'rep_natl', 'rep_prov', 'ms_psucode', 'enns_year', 'wrkplace',
+    'interview_status', 'intdate', 'enumcode',
+    'hhnum', 'member_code',
+    'ave_sbp', 'ave_dbp', 'sbp', 'dbp', 'systolic', 'diastolic', 'sysbp', 'diabp',
+    'blood_pressure',
+    'height', 'weight', 'waist', 'hip',
+]
+x_lc = {c.lower(): c for c in X.columns}
+manual_drop = sorted({x_lc[c.lower()] for c in manual_non_predictive if c.lower() in x_lc})
+
+protected_base_cols = []
+for col in X.columns:
+    col_lc = col.lower()
+    if any(alias in col_lc for alias in NON_REMOVABLE_BASE_ALIASES):
+        protected_base_cols.append(col)
+protected_base_cols = sorted(set(protected_base_cols))
+
+if manual_drop:
+    protected_drop = [c for c in manual_drop if c in protected_base_cols]
+    if protected_drop:
+        print('Manual-drop protection triggered for non-removable base features:', protected_drop)
+    manual_drop = [c for c in manual_drop if c not in protected_base_cols]
+    X = X.drop(columns=manual_drop, errors='ignore')
+
+base_removed_non_removable = []
+for alias in NON_REMOVABLE_BASE_ALIASES:
+    if not any(alias in c.lower() for c in X.columns):
+        base_removed_non_removable.append(alias)
+
+RETRAIN_REQUIRED_NON_REMOVABLE = len(base_removed_non_removable) > 0
+
+print(f'Loaded: {data_path}')
+print(f'Auto merged dataset: {AUTO_MERGED_DATA_PATH}')
+print(f'Target: {target_col}')
+print(f'Target defined from BP fallback: {TARGET_DEFINED_FROM_BP}')
+print(f'Raw rows: {len(df)}')
+print(f'Features after manual preprocessing: {X.shape[1]}')
+print(f'Manual dropped columns: {len(manual_drop)}')
+print(f'Behavior raw dropped columns: {len(behavior_drop)}')
+print(f'Anthropometric source dropped columns: {len(anthro_source_drop)}')
+print('Protected non-removable base columns:', protected_base_cols)
+print('Missing non-removable base aliases after base preprocessing:', base_removed_non_removable)
+print('Class balance:', y.value_counts(normalize=True).to_dict())
+
+--- Cell 7 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Imports & Setup ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Inherits: PROJECT_ROOT, X, y ΓÇö defined by earlier cells in this notebook.
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+from pathlib import Path
+from copy import deepcopy
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, OrdinalEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import (
+    accuracy_score, recall_score, precision_score,
+    f1_score, roc_auc_score, log_loss, make_scorer,
+)
+from sklearn.calibration import CalibratedClassifierCV
+
+from imblearn.over_sampling import SMOTE, SMOTENC
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from venn_abers import VennAbers
+import shap
+import lime.lime_tabular
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 60)
+pd.set_option('display.float_format', '{:.4f}'.format)
+
+E3_SEED = 42
+np.random.seed(E3_SEED)
+
+E3_DIR = PROJECT_ROOT / 'exp3_logreg_cat'
+(E3_DIR / 'models').mkdir(parents=True, exist_ok=True)
+(E3_DIR / 'plots').mkdir(parents=True, exist_ok=True)
+
+SAMPLING_METHODS = ['base', 'smote', 'smotenc', 'cw', 'smotecw', 'smotencw']
+MODEL_NAMES      = ['logreg', 'catboost']
+CAL_METHODS      = ['base', 'platt', 'isotonic', 'venn_abers']
+CW_SAMPLINGS     = {'cw', 'smotecw', 'smotencw'}   # variants that activate class-weight
+
+# RandomizedSearchCV iterations per model (slower models get fewer)
+N_ITER_MAP = {
+    'logreg': 10, 'knn': 10, 'adaboost': 10,
+    'catboost': 5, 'xgboost': 5, 'randomforest': 10,
+}
+
+SEARCH_SPACES = {
+    'logreg': {
+        'C': [0.001, 0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 50.0, 100.0],
+    },
+    'knn': {
+        'n_neighbors': [3, 5, 7, 9, 11, 15, 21],
+        'weights':     ['uniform', 'distance'],
+    },
+    'adaboost': {
+        'n_estimators': [50, 100, 200, 300],
+        'learning_rate': [0.01, 0.05, 0.1, 0.5, 1.0],
+    },
+    'catboost': {
+        'depth':         [4, 6, 8],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'iterations':    [100, 200, 300],
+    },
+    'xgboost': {
+        'max_depth':     [3, 5, 7],
+        'learning_rate': [0.01, 0.05, 0.1, 0.2],
+        'n_estimators':  [100, 200, 300],
+    },
+    'randomforest': {
+        'n_estimators':    [100, 200, 300],
+        'max_depth':       [None, 5, 10, 15],
+        'min_samples_leaf': [1, 2, 5],
+    },
+}
+
+print("EXP3 setup complete.")
+print("Artifact directory:", E3_DIR)
+
+
+--- Cell 8 ---
+# ΓöÇΓöÇ EXP3 ┬╖ 3-Way Split + Column Detection ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# 60 % Train | 20 % Calibration | 20 % Test  (stratified)
+
+X_e3_tr, X_e3_tmp, y_e3_tr, y_e3_tmp = train_test_split(
+    X, y, test_size=0.40, random_state=E3_SEED, stratify=y
+)
+X_e3_cal, X_e3_te, y_e3_cal, y_e3_te = train_test_split(
+    X_e3_tmp, y_e3_tmp, test_size=0.50, random_state=E3_SEED, stratify=y_e3_tmp
+)
+
+y_e3_tr  = np.asarray(y_e3_tr,  dtype=int)
+y_e3_cal = np.asarray(y_e3_cal, dtype=int)
+y_e3_te  = np.asarray(y_e3_te,  dtype=int)
+
+# Column types detected on training set
+e3_num_cols = X_e3_tr.select_dtypes(include=[np.number]).columns.tolist()
+e3_cat_cols = [c for c in X_e3_tr.columns if c not in e3_num_cols]
+
+print(pd.DataFrame({
+    'Split': ['Train', 'Cal', 'Test'],
+    'N':     [len(y_e3_tr), len(y_e3_cal), len(y_e3_te)],
+    'Pos %': [f"{y_e3_tr.mean()*100:.1f}", f"{y_e3_cal.mean()*100:.1f}", f"{y_e3_te.mean()*100:.1f}"],
+}).to_string(index=False))
+print(f"\nNumeric features : {len(e3_num_cols)}")
+print(f"Categorical      : {len(e3_cat_cols)}")
+
+
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
+
+--- Cell 10 ---
+# ΓöÇΓöÇ EXP3_C_LogReg_CatBoost ┬╖ KNN Imputation + Collinearity Filter + Scale/OHE Fit ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+from sklearn.model_selection import ParameterSampler
+
+e3_knn_imp, e3_cat_imp = e3_fit_imputers(X_e3_tr, e3_num_cols, e3_cat_cols)
+
+X_e3_tr_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_tr,  e3_num_cols, e3_cat_cols)
+X_e3_cal_imp = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_cal, e3_num_cols, e3_cat_cols)
+X_e3_te_imp  = e3_impute(e3_knn_imp, e3_cat_imp, X_e3_te,  e3_num_cols, e3_cat_cols)
+
+# ΓöÇΓöÇ Collinearity filter (cutoff = COLLINEARITY_CUTOFF, mirrors original experiment) ΓöÇΓöÇ
+# Protects age, sex, bmi, whr from ever being dropped.
+_e3_protected = sorted({
+    c for c in e3_num_cols
+    if any(a in c.lower() for a in ['age', 'sex', 'bmi', 'whr'])
+})
+_e3_corr  = X_e3_tr_imp[e3_num_cols].corr().abs()
+_e3_upper = _e3_corr.where(np.triu(np.ones(_e3_corr.shape), k=1).astype(bool))
+_e3_drop  = [
+    c for c in _e3_upper.columns
+    if c not in _e3_protected and (_e3_upper[c] > COLLINEARITY_CUTOFF).any()
+]
+e3_num_cols  = [c for c in e3_num_cols if c not in _e3_drop]   # updated globally
+_e3_all_keep = e3_num_cols + e3_cat_cols
+X_e3_tr_imp  = X_e3_tr_imp[_e3_all_keep]
+X_e3_cal_imp = X_e3_cal_imp[_e3_all_keep]
+X_e3_te_imp  = X_e3_te_imp[_e3_all_keep]
+print(f"Collinearity filter (cutoff={COLLINEARITY_CUTOFF}): "
+      f"dropped {len(_e3_drop)} ΓåÆ kept {len(e3_num_cols)} numeric features")
+if _e3_drop:
+    print("  Dropped:", _e3_drop)
+if _e3_protected:
+    print("  Protected:", _e3_protected)
+
+
+# Scaler + OHE fitted on original (un-resampled) training data
+e3_scaler, e3_ohe, e3_feat_names = e3_fit_enc_scaler(X_e3_tr_imp, e3_num_cols, e3_cat_cols)
+
+# Cal / test are never resampled
+X_e3_cal_proc = e3_encode_scale(e3_scaler, e3_ohe, X_e3_cal_imp, e3_num_cols, e3_cat_cols)
+X_e3_te_proc  = e3_encode_scale(e3_scaler, e3_ohe, X_e3_te_imp,  e3_num_cols, e3_cat_cols)
+
+print(f"Cal : {X_e3_cal_proc.shape}  |  Test: {X_e3_te_proc.shape}  |  Features: {len(e3_feat_names)}")
+
+# ΓöÇΓöÇ 2-Stage Optimization Config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Reduce E3_S1_TRIALS / E3_S2_REFINE for faster runs (lower quality).
+# Increase for publication-quality results.
+
+E3_S1_TRIALS    = 15    # random param trials per (model, sampling) ΓÇö Stage 1
+E3_S1_EPOCHS    = 80    # tree iterations during Stage-1 CV
+E3_S1_FOLDS     = 2     # CV folds in Stage 1
+E3_TOP_K_S1     = 5     # top configs carried forward to Stage 2
+
+E3_S2_REFINE    = 2     # local perturbations per top config ΓÇö Stage 2
+E3_S2_EPOCHS    = 200   # tree iterations during Stage-2 CV
+E3_S2_FOLDS     = 3     # CV folds in Stage 2
+E3_TOP_K_S2     = 2     # best Stage-2 configs used for final training
+
+E3_FINAL_EPOCHS = 400   # tree iterations for the final (full-train) model
+THRESHOLD_GRID  = np.round(np.arange(0.35, 0.70, 0.05), 2)
+
+# ΓöÇΓöÇ Parameter search spaces ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+E3_MODEL_SPACES = {
+    'logreg': {
+        'C':      loguniform(1e-4, 1e2),
+        'solver': ['lbfgs', 'liblinear'],
+    },
+    'knn': {
+        'n_neighbors': randint(3, 31),
+        'weights':     ['uniform', 'distance'],
+        'metric':      ['euclidean', 'manhattan'],
+    },
+    'adaboost': {
+        'n_estimators': randint(50, 300),
+        'learning_rate': uniform(0.01, 0.49),
+        'base_depth':    randint(1, 5),
+    },
+    'catboost': {
+        'learning_rate':   loguniform(0.01, 0.30),
+        'depth':           randint(4, 10),
+        'l2_leaf_reg':     uniform(1.0, 9.0),
+        'random_strength': uniform(0.1, 1.9),
+    },
+    'xgboost': {
+        'learning_rate':    loguniform(0.01, 0.30),
+        'max_depth':        randint(3, 9),
+        'subsample':        uniform(0.6, 0.4),
+        'colsample_bytree': uniform(0.6, 0.4),
+        'min_child_weight': randint(1, 7),
+        'gamma':            uniform(0.0, 0.5),
+        'reg_lambda':       loguniform(1e-2, 10),
+    },
+    'randomforest': {
+        'max_features':      uniform(0.2, 0.8),
+        'min_samples_split': randint(2, 20),
+        'min_samples_leaf':  randint(1, 10),
+        'max_depth':         [None, 10, 20, 30],
+    },
+}
+
+_n_s2_cands = E3_TOP_K_S1 * (E3_S2_REFINE + 1)
+print(f"\nStage 1 : {E3_S1_TRIALS} trials ├ù {E3_S1_FOLDS} folds, top-{E3_TOP_K_S1} kept")
+print(f"Stage 2 : ~{_n_s2_cands} candidates ├ù {E3_S2_FOLDS} folds, top-{E3_TOP_K_S2} for final")
+print(f"Final   : {E3_FINAL_EPOCHS} epochs, threshold swept on Cal set")
+print(f"Total   : {len(SAMPLING_METHODS)} samplings ├ù {len(MODEL_NAMES)} models = {len(SAMPLING_METHODS)*len(MODEL_NAMES)} combos")
+
+# ΓöÇΓöÇ 2-Stage Optimization + Final Training Loop ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+e3_stage1_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-1 trial results
+e3_stage2_results = {}    # (sampling, model) ΓåÆ DataFrame of Stage-2 trial results
+e3_best_configs   = {}    # (sampling, model) ΓåÆ list of best Stage-2 params dicts
+e3_results        = []    # pre-calibration test metrics
+e3_models         = {}    # (sampling, model) ΓåÆ fitted final model
+e3_tr_data        = {}    # (sampling, model) ΓåÆ (X_tr_proc, y_tr_proc)
+
+for sampling in SAMPLING_METHODS:
+    use_cw = sampling in CW_SAMPLINGS
+    print(f"\n{'ΓòÉ'*68}")
+    print(f"Sampling: {sampling:12s}  |  class-weight active: {use_cw}")
+    print(f"{'ΓòÉ'*68}")
+
+    for model_name in MODEL_NAMES:
+        key = (sampling, model_name)
+
+        # ΓöÇΓöÇ Stage 1: broad random search ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+        trials = list(ParameterSampler(
+            E3_MODEL_SPACES[model_name], n_iter=E3_S1_TRIALS, random_state=E3_SEED))
+        s1_rows = []
+        for i, params in enumerate(trials, start=1):
+            try:
+                cv_met = e3_evaluate_params_cv(
+                    model_name, params, sampling,
+                    X_e3_tr_imp, y_e3_tr,
+                    E3_S1_EPOCHS, E3_S1_FOLDS, seed=E3_SEED)
+                s1_rows.append({'trial': i, 'params': params, **cv_met})
+            except Exception as exc:
+                s1_rows.append({'trial': i, 'params': pa
+
+--- Cell 11 ---
+# ΓöÇΓöÇ EXP3-C ┬╖ LightGBM-Only Training  (appends to e3_results / e3_models) ΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Run this cell standalone ΓÇö it appends to the same e3_results / e3_models /
+# e3_tr_data dicts so all downstream cells (pre-cal, calibration, SHAP, LIME)
+# will see logreg + catboost + lightgbm together.
+# Re-run pre-calibration and all cells after this one once it finishes.
+
+import os, contextlib
+from lightgbm import LGBMClassifier
+from copy import deepcopy
+from sklearn.model_selection import ParameterSampler, StratifiedKFold
+from scipy.stats import loguniform, randint, uniform as sp_uniform
+from sklearn.metrics import (accuracy_score, recall_score, precision_score,
+                              f1_score, roc_auc_score, log_loss)
+
+@contextlib.contextmanager
+def _quiet_stderr():
+    """Redirect file-descriptor 2 to /dev/null to suppress C-level stderr (e.g. OpenCL warnings)."""
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+    saved_fd   = os.dup(2)
+    os.dup2(devnull_fd, 2)
+    try:
+        yield
+    finally:
+        os.dup2(saved_fd, 2)
+        os.close(saved_fd)
+        os.close(devnull_fd)
+
+_LGB_SPACES = {
+    'learning_rate':     loguniform(0.01, 0.30),
+    'max_depth':         randint(3, 10),
+    'num_leaves':        randint(15, 150),
+    'subsample':         sp_uniform(0.6, 0.4),
+    'colsample_bytree':  sp_uniform(0.6, 0.4),
+    'reg_lambda':        loguniform(1e-2, 10),
+}
+
+def _build_lgb(params, use_cw, y_sample, epoch_budget, seed=42):
+    use_gpu = bool(USE_GPU_WHEN_AVAILABLE and torch_cuda_available)
+    n_pos = int(np.asarray(y_sample).sum())
+    n_neg = len(y_sample) - n_pos
+    pos_w = float(n_neg) / max(n_pos, 1)
+    p = deepcopy(params)
+    md = p.get('max_depth', 6)
+    return LGBMClassifier(
+        n_estimators     = int(epoch_budget),
+        learning_rate    = max(1e-4, float(p.get('learning_rate', 0.1))),
+        max_depth        = int(md) if md != -1 else -1,
+        num_leaves       = max(2, int(round(p.get('num_leaves', 31)))),
+        subsample        = float(np.clip(p.get('subsample', 0.8), 0.1, 1.0)),
+        colsample_bytree = float(np.clip(p.get('colsample_bytree', 0.8), 0.1, 1.0)),
+        reg_lambda       = max(0.0, float(p.get('reg_lambda', 1.0))),
+        scale_pos_weight = pos_w if use_cw else 1.0,
+        device_type      = 'gpu' if use_gpu else 'cpu',
+        random_state     = seed,
+        verbose          = -1,
+    )
+
+def _lgb_fit(mdl, X, y):
+    """Fit LightGBM while suppressing C-level OpenCL compiler warnings."""
+    with _quiet_stderr():
+        mdl.fit(X, y)
+
+def _lgb_cv(params, sampling, X_tr_imp, y_tr, epoch_budget, n_splits, seed):
+    use_cw_ = sampling in CW_SAMPLINGS
+    splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    thr_grid = np.round(np.arange(0.35, 0.70, 0.05), 2)
+    fold_rows = []
+    y_arr = np.asarray(y_tr, dtype=int)
+    for fold_i, (tr_idx, va_idx) in enumerate(splitter.split(X_tr_imp, y_arr), start=1):
+        Xf_tr = X_tr_imp.iloc[tr_idx]; Xf_va = X_tr_imp.iloc[va_idx]
+        yf_tr = y_arr[tr_idx];         yf_va = y_arr[va_idx]
+        f_sc, f_ohe, _ = e3_fit_enc_scaler(Xf_tr, e3_num_cols, e3_cat_cols)
+        Xf_tr_s, yf_tr_s = e3_get_sampled_train(Xf_tr, yf_tr, sampling, f_sc, f_ohe,
+                                                  e3_num_cols, e3_cat_cols, seed=seed)
+        yf_tr_s = np.asarray(yf_tr_s, dtype=int)
+        Xf_va_p = e3_encode_scale(f_sc, f_ohe, Xf_va, e3_num_cols, e3_cat_cols)
+        mdl = _build_lgb(params, use_cw_, yf_tr_s, epoch_budget, seed)
+        try:
+            _lgb_fit(mdl, Xf_tr_s, yf_tr_s)
+        except Exception as exc:
+            if 'gpu' in str(exc).lower() or 'cuda' in str(exc).lower():
+                mdl.set_params(device_type='cpu')
+                _lgb_fit(mdl, Xf_tr_s, yf_tr_s)
+            else:
+                raise
+        p_val = np.clip(mdl.predict_proba(Xf_va_p)[:, 1], 1e-9, 1-1e-9)
+        best_obj, best_met, best_thr = -np.inf, None, 0.5
+        for thr in thr_grid:
+            yp  = (p_val >= thr).astype(int)
+            acc = accuracy_score(yf_va, yp)
+            rec = recall_score(yf_va, yp, zero_division=0)
+            obj = 0.60*acc + 0.40*rec
+            if obj > best_obj:
+                best_obj = obj
+                best_met = dict(
+                    accuracy  = acc, recall = rec,
+                    precision = precision_score(yf_va, yp, zero_division=0),
+                    f1        = f1_score(yf_va, yp, zero_division=0),
+                    auc       = roc_auc_score(yf_va, p_val) if np.unique(yf_va).size > 1 else 0.5,
+                    logloss   = log_loss(yf_va, p_val),
+                )
+                best_thr = float(thr)
+        best_met['fold'] = fold_i; best_met['best_threshold'] = best_thr
+        fold_rows.append(best_met)
+    dfc = pd.DataFrame(fold_rows)
+    s = {k+'_mean': float(dfc[k].mean()) for k in ['accuracy','recall','precision','f1','auc','logloss']}
+    s.update({k+'_std': float(dfc[k].std(ddof=0)) for k in ['accuracy','recall','f1','logloss']})
+    s['threshold_mean'] = float(dfc['best_threshold'].mean())
+    s['stage_score'] = (0.60*s['accuracy_mean'] + 0.40*s['recall_mean']
+        + 0.05*s['f1_mean'] - 0.08*s['logloss_mean']
+        - 0.03*s['accuracy_std'] - 0.03*s['recall_std'])
+    return s
+
+_lgb_s1_results = {}
+_lgb_s2_results = {}
+
+for sampling in SAMPLING_METHODS:
+    use_cw = sampling in CW_SAMPLINGS
+    key    = (sampling, 'lightgbm')
+    print(f"\n{'ΓòÉ'*68}")
+    print(f"LightGBM | Sampling: {sampling:12s}  |  class-weight: {use_cw}")
+    print(f"{'ΓòÉ'*68}")
+
+    # ΓöÇΓöÇ Stage 1 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    trials  = list(ParameterSampler(_LGB_SPACES, n_iter=E3_S1_TRIALS, random_state=E3_SEED))
+    s1_rows = []
+    for i, params in enumerate(trials, start=1):
+        try:
+            cv_met = _lgb_cv(params, sampling, X_e3_tr_imp, y_e3_tr,
+                             E3_S1_EPOCHS, E3_S1_FOLDS, E3_SEED)
+            s1_rows.append({'trial': i, 'params': params, **cv_met})
+   
+

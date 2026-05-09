@@ -1,0 +1,654 @@
+﻿
+
+====== EXP3_A_KNN_RF.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
+
+
+====== EXP3_B_XGB_AdaBoost.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
+
+
+====== EXP3_C_LogReg_CatBoost.ipynb ======
+--- Cell 3 ---
+import json
+import random
+import warnings
+from copy import deepcopy
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from scipy.stats import randint, uniform, loguniform
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+from sklearn.model_selection import ParameterSampler, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
+
+warnings.filterwarnings('ignore')
+pd.set_option('display.max_columns', 300)
+
+xgb_available = True
+cat_available = True
+venn_available = True
+torch_available = True
+torch_cuda_available = False
+cuml_available = True
+
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    xgb_available = False
+    XGBClassifier = None
+
+try:
+    from catboost import CatBoostClassifier
+except Exception:
+    cat_available = False
+    CatBoostClassifier = None
+
+try:
+    from venn_abers import VennAbers
+except Exception:
+    venn_available = False
+    VennAbers = None
+
+try:
+    import torch
+    torch_cuda_available = bool(torch.cuda.is_available())
+except Exception:
+    torch_available = False
+
+try:
+    from cuml.ensemble import RandomForestClassifier as cuRFClassifier
+except Exception:
+    cuml_available = False
+    cuRFClassifier = None
+
+print({
+    'xgboost': xgb_available,
+    'catboost': cat_available,
+    'venn_abers': venn_available,
+    'torch': torch_available,
+    'torch_cuda': torch_cuda_available,
+    'cuml_rf': cuml_available,
+})
+--- Cell 9 ---
+# ΓöÇΓöÇ EXP3 ┬╖ Helper Functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+# ΓöÇΓöÇ OHE factory ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def _e3_ohe():
+    try:
+        return OneHotEncoder(handle_unknown='ignore', sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown='ignore', sparse=False)
+
+# ΓöÇΓöÇ Imputation ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_imputers(X_tr, num_cols, cat_cols):
+    knn = KNNImputer(n_neighbors=5)
+    knn.fit(X_tr[num_cols] if num_cols else pd.DataFrame())
+    cat = None
+    if cat_cols:
+        cat = SimpleImputer(strategy='most_frequent')
+        cat.fit(X_tr[cat_cols])
+    return knn, cat
+
+def e3_impute(knn, cat_imp, X, num_cols, cat_cols):
+    frames = []
+    if num_cols:
+        frames.append(pd.DataFrame(
+            knn.transform(X[num_cols]), columns=num_cols, index=X.index))
+    if cat_cols and cat_imp is not None:
+        frames.append(pd.DataFrame(
+            cat_imp.transform(X[cat_cols]), columns=cat_cols, index=X.index))
+    return pd.concat(frames, axis=1) if frames else pd.DataFrame(index=X.index)
+
+# ΓöÇΓöÇ Scale + OHE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_enc_scaler(X_imp, num_cols, cat_cols):
+    scaler = StandardScaler()
+    ohe    = None
+    feat_names = list(num_cols)
+    if num_cols:
+        scaler.fit(X_imp[num_cols])
+    if cat_cols:
+        ohe = _e3_ohe()
+        ohe.fit(X_imp[cat_cols].astype(str))
+        feat_names += ohe.get_feature_names_out(cat_cols).tolist()
+    return scaler, ohe, feat_names
+
+def e3_encode_scale(scaler, ohe, X_imp, num_cols, cat_cols):
+    parts = []
+    if num_cols:
+        parts.append(scaler.transform(X_imp[num_cols]))
+    if cat_cols and ohe is not None:
+        parts.append(ohe.transform(X_imp[cat_cols].astype(str)))
+    return np.hstack(parts) if parts else np.empty((len(X_imp), 0))
+
+# ΓöÇΓöÇ Sampling ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_get_sampled_train(X_tr_imp, y_tr, sampling, scaler, ohe, num_cols, cat_cols, seed=42):
+    min_cls = int(np.bincount(np.asarray(y_tr, dtype=int)).min())
+    k_nb    = max(1, min(5, min_cls - 1))
+
+    if sampling in ('base', 'cw'):
+        return e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols), np.asarray(y_tr).copy()
+
+    if sampling in ('smote', 'smotecw'):
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    # SMOTENC / SMOTENCW
+    if not cat_cols:
+        Xp = e3_encode_scale(scaler, ohe, X_tr_imp, num_cols, cat_cols)
+        return SMOTE(random_state=seed, k_neighbors=k_nb).fit_resample(Xp, y_tr)
+
+    oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+    X_cat_ord  = oe.fit_transform(X_tr_imp[cat_cols].astype(str))
+    X_num_arr  = X_tr_imp[num_cols].values if num_cols else np.empty((len(X_tr_imp), 0))
+    X_combined = np.hstack([X_num_arr, X_cat_ord])
+    cat_idx    = list(range(len(num_cols), len(num_cols) + len(cat_cols)))
+
+    X_res, y_res = SMOTENC(
+        categorical_features=cat_idx, random_state=seed, k_neighbors=k_nb
+    ).fit_resample(X_combined, y_tr)
+
+    df_num = pd.DataFrame(X_res[:, :len(num_cols)], columns=num_cols) if num_cols else pd.DataFrame()
+    X_cat_labels = oe.inverse_transform(np.clip(np.round(X_res[:, len(num_cols):]), 0, None).astype(float))
+    df_cat = pd.DataFrame(X_cat_labels, columns=cat_cols)
+    X_res_imp = pd.concat([df_num, df_cat], axis=1)
+    return e3_encode_scale(scaler, ohe, X_res_imp, num_cols, cat_cols), y_res
+
+# ΓöÇΓöÇ ECE ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_ece(y_true, y_prob, n_bins=10):
+    y_true = np.asarray(y_true).astype(int)
+    y_prob = np.clip(np.asarray(y_prob), 1e-9, 1 - 1e-9)
+    bins   = np.linspace(0, 1, n_bins + 1)
+    idx    = np.digitize(y_prob, bins) - 1
+    ece    = 0.0
+    for i in range(n_bins):
+        m = idx == i
+        if m.sum() == 0:
+            continue
+        ece += m.mean() * abs(y_true[m].mean() - y_prob[m].mean())
+    return float(ece)
+
+# ΓöÇΓöÇ Metric pack ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_metrics(y_true, y_prob, thr=0.5):
+    yp = (np.asarray(y_prob) >= thr).astype(int)
+    return dict(
+        accuracy  = accuracy_score(y_true, yp),
+        recall    = recall_score(y_true, yp, zero_division=0),
+        precision = precision_score(y_true, yp, zero_division=0),
+        f1        = f1_score(y_true, yp, zero_division=0),
+        auc       = roc_auc_score(y_true, y_prob),
+        logloss   = log_loss(y_true, y_prob),
+        ece       = e3_ece(y_true, y_prob),
+    )
+
+# ΓöÇΓöÇ Calibration helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+def e3_fit_calibrator(method, p_cal, y_cal):
+    if method == 'base':    return None
+    if method == 'platt':
+        lr = LogisticRegression(max_iter=3000, random_state=42)
+        lr.fit(p_cal.reshape(-1, 1), y_cal)
+        return lr
+    if method == 'isotonic':
+        iso = IsotonicRegression(out_of_bounds='clip')
+        iso.fit(p_cal, y_cal)
+        return iso
+    if method == 'venn_abers':
+        va = VennAbers()
+        va.fit(np.column_stack([1.0 - p_cal, p_cal]), y_cal)
+        return va
+    raise ValueError(method)
+
+def e3_apply_calibrator(method, calibrator, p_eval):
+    p = np.clip(np.asarray(p_eval), 1e-9, 1 - 1e-9)
+    if method == 'base' or calibrator is None:
+        return p
+    if method == 'platt':
+        return np.clip(calibrator.predict_proba(p.reshape(-1, 1))[:, 1], 1e-9, 1 - 1e-9)
+    if method == 'isotonic':
+        return np.clip(calibrator.predict(p), 1e-9, 1 - 1e-9)
+    if method == 'venn_abers':
+        _, p1 = calibrator.predict_proba(np.column_stack([1.0 - p, p]))
+        p1 = np.asarray(p1)
+        return np.clip(p1[:, 1] if p1.ndim == 2 else p1.reshape(-1), 1e-9, 1 - 1e-9)
+    raise ValueError(method)
+
+# ΓöÇΓöÇ Combined accuracy + recall scorer (legacy, ke
