@@ -855,19 +855,24 @@ if not st.session_state.show_form:
                                                     letter-spacing:0.15em;color:#64748b;margin-bottom:1rem;">Model Performance</div>
                             <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.2rem;">
                                 <div style="text-align:center;">
-                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">76.3%</div>
+                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">75.2%</div>
                                     <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Accuracy</div>
                                 </div>
                                 <div style="text-align:center;">
-                                    <div style="font-size:2rem;font-weight:800;color:#dc2626;">85.3%</div>
+                                    <div style="font-size:2rem;font-weight:800;color:#dc2626;">84.6%</div>
                                     <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Recall</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">84.8%</div>
+                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">AUC</div>
                                 </div>
                             </div>
                             <div style="font-size:0.83rem;color:#475569;line-height:1.65;text-align:justify;text-justify:inter-word;">
                                 <strong>Accuracy</strong> is the share of all individuals the model classifies correctly.
                                 <strong>Recall</strong> (sensitivity) is the share of true hypertensive cases the model catches —
                                 prioritised here because missing a true positive in health screening carries greater risk than a false alarm.
-                                Metrics are from the calibrated CatBoost (isotonic, threshold 0.35) evaluated on the held-out test set.
+                                <strong>AUC</strong> reflects overall discriminative power across all thresholds.
+                                Metrics are from the EXP3 best model: CatBoost with class-weight balancing (base calibration, threshold 0.45) evaluated on the held-out test set.
                             </div>
                         </div>
                         """,
@@ -919,7 +924,8 @@ else:
     dietary_addend_fields: list[str] = []
     required_field_labels: dict[str, str] = {}
     rendered_feature_names: set[str] = set()
-    engineered_names = {"BMI", "bmi", "whr", "alcohol_level", "smoking_level"}
+    engineered_names = {"BMI", "bmi", "whr", "alcohol_level", "smoking_level",
+                         "fe_smoking_level", "fe_alcohol_level"}
     has_engineered_features = any(
         name in engineered_names or name.startswith("alcohol_level_") or name.startswith("smoking_level_")
         for name in feature_names
@@ -1248,10 +1254,16 @@ else:
                 unsafe_allow_html=True,
             )
         with kpi_b:
-            st.markdown(
-                f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>{result.lower_bound*100:.1f}% - {result.upper_bound*100:.1f}%</div><div class='oh-sub'>Venn-Abers interval</div></div>",
-                unsafe_allow_html=True,
-            )
+            if result.uncertainty_width > 0.001:
+                st.markdown(
+                    f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>{result.lower_bound*100:.1f}% - {result.upper_bound*100:.1f}%</div><div class='oh-sub'>Venn-Abers interval</div></div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>N/A</div><div class='oh-sub'>No interval calibration applied</div></div>",
+                    unsafe_allow_html=True,
+                )
         with kpi_c:
             st.markdown(
                 f"<div class='output-hero'><div class='oh-label'>Risk Classification</div><div class='oh-value' style='font-size:1.15rem;'><span class='risk-badge {tier_css}'>{mapped_risk_label}</span></div><div class='oh-sub'>Based on calibrated probability</div></div>",
