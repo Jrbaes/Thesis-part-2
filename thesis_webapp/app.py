@@ -48,7 +48,7 @@ from styles import apply_global_styles
 PLOTLY_STATIC_CONFIG = {"displayModeBar": False}
 
 
-st.set_page_config(page_title="Hypertension Risk Assesment", page_icon="", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Hypertension Risk Assessment", page_icon="", layout="wide", initial_sidebar_state="collapsed")
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -897,7 +897,7 @@ else:
     with nav_left:
         st.markdown(
             "<div style='display:flex;align-items:center;gap:0.7rem;padding:0.5rem 0;'>"
-            "<span style='font-size:1.2rem;font-weight:700;color:#0f172a;'>Hypertension Risk Assesment</span>"
+            "<span style='font-size:1.2rem;font-weight:700;color:#0f172a;'>Hypertension Risk Assessment</span>"
             "</div>",
             unsafe_allow_html=True,
         )
