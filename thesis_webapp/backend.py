@@ -14,7 +14,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 
 
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib"
+# ── EXP3-C bundle (CatBoost cw/base, best across EXP3 A/B/C) ────────────────
+EXP3_BUNDLE_PATH = PROJECT_ROOT / "exp3_logreg_cat" / "models" / "best_model_bundle.joblib"
+
+# Fall back to old GPU-exp2 artifacts when the EXP3-C bundle has not been
+# generated yet (run the save cell in EXP3_C_LogReg_CatBoost.ipynb first).
+_OLD_MODEL_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib"
+_OLD_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
+
+DEFAULT_MODEL_PATH = EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH.exists() else _OLD_MODEL_PATH
+DEFAULT_PREPROCESSOR_PATH = EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH.exists() else _OLD_PREPROCESSOR_PATH
 
 _calibrator_candidates = [
     PROJECT_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib",
@@ -22,23 +31,29 @@ _calibrator_candidates = [
 ]
 DEFAULT_CALIBRATOR_PATH = next((path for path in _calibrator_candidates if path.exists()), _calibrator_candidates[0])
 
-DEFAULT_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
-
 ONE_HOT_GROUPS = {
     "alcohol_level": ["0.0", "1.0", "2.0", "3.0", "nan"], "smoking_level": ["0.0", "1.0", "2.0", "3.0", "nan"],
 }
 
-ENGINEERED_TARGET_FEATURES = {"alcohol_level", "smoking_level", "BMI", "bmi", "whr"}
+# EXP3-C uses numeric fe_smoking_level / fe_alcohol_level instead of OHE columns.
+ENGINEERED_TARGET_FEATURES = {
+    "alcohol_level", "smoking_level",
+    "fe_alcohol_level", "fe_smoking_level",
+    "BMI", "bmi", "whr",
+}
 
 NUMERIC_DEFAULTS = {
-    "ethnicity": 1.0, "waist": 0.0, "hip": 0.0, "BMI": 0.0,
+    "ethnicity": 1.0, "waist": 0.0, "hip": 0.0, "BMI": 0.0, "bmi": 0.0, "whr": 0.0,
+    "fe_smoking_level": 0.0, "fe_alcohol_level": 0.0,
     "Total_Food_epwt": 0.0, "Total_Ener": 0.0, "Total_Prot": 0.0, "Total_Calc": 0.0,
     "Total_Iron": 0.0, "Total_VitA": 0.0, "Total_VitC": 0.0,
     "Total_Thia": 0.0, "Total_Ribo": 0.0, "Total_Nia": 0.0, "Total_CHO": 0.0, "Total_Fat": 0.0,
 }
 
 RANGE_HINTS = {
-    "ethnicity": (0.0, 10.0, 1.0), "waist": (40.0, 180.0, 0.5), "hip": (40.0, 180.0, 0.5), "BMI": (10.0, 60.0, 0.1),
+    "ethnicity": (0.0, 10.0, 1.0), "waist": (40.0, 180.0, 0.5), "hip": (40.0, 180.0, 0.5),
+    "BMI": (10.0, 60.0, 0.1), "bmi": (10.0, 60.0, 0.1), "whr": (0.5, 2.0, 0.01),
+    "fe_smoking_level": (0.0, 3.0, 1.0), "fe_alcohol_level": (0.0, 3.0, 1.0),
     "Total_Food_epwt": (0.0, 1760.0, 5.0), "Total_Ener": (0.0, 3890.0, 10.0), "Total_Prot": (0.0, 150.0, 1.0),
     "Total_Calc": (0.0, 1270.0, 10.0), "Total_Iron": (0.0, 30.0, 0.5), "Total_VitA": (0.0, 4810.0, 10.0),
     "Total_VitC": (0.0, 190.0, 1.0), "Total_Thia": (0.0, 10.0, 0.05), "Total_Ribo": (0.0, 10.0, 0.05),
@@ -65,8 +80,71 @@ class PredictionResult:
     uncertainty_width: float
 
 
+class Exp3BundlePreprocessor:
+    """Sklearn-compatible transformer wrapping the EXP3-C multi-step preprocessing bundle.
+
+    Pipeline: KNN impute (full num cols) → collinearity select (reduced num cols)
+              → StandardScaler + OneHotEncoder → hstack output.
+    """
+
+    def __init__(self, bundle: dict) -> None:
+        self._b = bundle
+        self.feature_names_in_ = np.array(bundle["input_feature_names"])
+
+    # ------------------------------------------------------------------
+    def transform(self, X: pd.DataFrame) -> np.ndarray:
+        b = self._b
+        num_full = b["num_cols_full"]
+        num_red  = b["num_cols_reduced"]
+        cat      = b["cat_cols"]
+
+        # --- impute numerics (full set) ---
+        if num_full:
+            num_imp = pd.DataFrame(
+                b["knn_imputer"].transform(X[num_full]),
+                columns=num_full, index=X.index,
+            )
+        else:
+            num_imp = pd.DataFrame(index=X.index)
+
+        # --- impute categoricals ---
+        if cat and b.get("cat_imputer") is not None:
+            cat_imp = pd.DataFrame(
+                b["cat_imputer"].transform(X[cat]),
+                columns=cat, index=X.index,
+            )
+        else:
+            cat_imp = pd.DataFrame(index=X.index)
+
+        # --- scale surviving numeric cols + OHE categoricals ---
+        parts: list[np.ndarray] = []
+        if num_red:
+            parts.append(b["scaler"].transform(num_imp[num_red]))
+        if cat and b.get("ohe") is not None:
+            parts.append(b["ohe"].transform(cat_imp[cat].astype(str)))
+
+        return np.hstack(parts) if parts else np.empty((len(X), 0), dtype=float)
+
+    def get_feature_names_out(self) -> np.ndarray:
+        return np.array(self._b["feat_names"])
+
+
+def _is_exp3_bundle(obj: Any) -> bool:
+    return isinstance(obj, dict) and "knn_imputer" in obj
+
+
 def load_model(model_path: Path | str = DEFAULT_MODEL_PATH):
-    return joblib.load(Path(model_path))
+    obj = joblib.load(Path(model_path))
+    if _is_exp3_bundle(obj):
+        # Wrap as the dict format predict_with_venn_abers expects.
+        return {
+            "base_model":         obj["model"],
+            "feature_names":      obj["feat_names"],
+            "calibration_method": obj.get("calibration", "base"),
+            "calibrator":         None,
+            "threshold":          obj.get("threshold", 0.5),
+        }
+    return obj
 
 
 def load_calibrator(calibrator_path: Path | str = DEFAULT_CALIBRATOR_PATH):
@@ -74,7 +152,13 @@ def load_calibrator(calibrator_path: Path | str = DEFAULT_CALIBRATOR_PATH):
 
 
 def load_preprocessor(preprocessor_path: Path | str = DEFAULT_PREPROCESSOR_PATH):
-    return joblib.load(path) if (path := Path(preprocessor_path)).exists() else None
+    path = Path(preprocessor_path)
+    if not path.exists():
+        return None
+    obj = joblib.load(path)
+    if _is_exp3_bundle(obj):
+        return Exp3BundlePreprocessor(obj)
+    return obj
 
 
 def load_feature_names(model: Any) -> list[str]:
@@ -231,9 +315,14 @@ def group_feature_names(feature_names: list[str]) -> dict[str, list[str]]:
     for feature_name in feature_names:
         if feature_name.startswith("alcohol_level_") or feature_name.startswith("smoking_level_"):
             grouped["Lifestyle encodings"].append(feature_name)
-        elif feature_name in {"pa_met", "fbs", "chol", "tri", "hdl", "ldl", "ethnicity"}:
+        elif feature_name in {"fe_smoking_level", "fe_alcohol_level"}:
+            # EXP3-C engineered behavioral features — computed, not shown directly.
+            grouped["Lifestyle encodings"].append(feature_name)
+        elif feature_name in {"pa_met", "fbs", "chol", "tri", "hdl", "ldl", "ethnicity",
+                               "hemoglobin", "uic", "vita"}:
             grouped["Core clinical"].append(feature_name)
-        elif feature_name in {"waist", "hip", "BMI"}:
+        elif feature_name in {"waist", "hip", "BMI", "bmi", "whr"}:
+            # bmi and whr are computed from raw inputs, not shown directly.
             grouped["Anthropometrics"].append(feature_name)
         elif feature_name.startswith("epwt_fg") or feature_name.startswith("fg") or feature_name.startswith("Total_"):
             grouped["Dietary pattern"].append(feature_name)
@@ -258,6 +347,12 @@ def build_input_values_from_widgets(feature_names: list[str], widget_values: dic
         values["alcohol_level"] = float(alcohol_level if alcohol_level is not None else feature_default("alcohol_level"))
     if "smoking_level" in feature_names:
         values["smoking_level"] = float(smoking_level if smoking_level is not None else feature_default("smoking_level"))
+
+    # EXP3-C numeric engineered behavioral features.
+    if "fe_smoking_level" in feature_names:
+        values["fe_smoking_level"] = float(smoking_level if smoking_level is not None else 0.0)
+    if "fe_alcohol_level" in feature_names:
+        values["fe_alcohol_level"] = float(alcohol_level if alcohol_level is not None else 0.0)
 
     if bmi_value is not None:
         if "BMI" in feature_names:
