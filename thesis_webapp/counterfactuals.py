@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app_constants import DISPLAY_LABEL_OVERRIDES
 from backend import (
     RANGE_HINTS,
     build_input_values_from_widgets,
@@ -17,6 +18,16 @@ from backend import (
 
 NON_ACTIONABLE_FEATURES = {"age", "sex", "ethnicity", "ethnicity_group"}
 REDUCE_ONLY_FEATURES = {"BMI", "bmi", "waist", "hip"}
+
+
+def _display_label(fname: str, dictionary_labels: dict[str, str]) -> str:
+    """Return a clean display label — same priority order as the form UI."""
+    if fname in DISPLAY_LABEL_OVERRIDES:
+        return DISPLAY_LABEL_OVERRIDES[fname]
+    raw = dictionary_labels.get(fname, "")
+    if raw:
+        return raw.split(":", 1)[0].strip().replace("  ", " ")
+    return fname.replace("_", " ").strip().title()
 
 
 def compute_counterfactuals(
@@ -33,6 +44,8 @@ def compute_counterfactuals(
 
     LAMBDA = 0.5
     Y_TARGET = 0.49
+    DECISION_BOUNDARY = 0.50
+    GRID_STEPS = 60  # fallback grid resolution when Wachter can't cross 0.5
 
     scan_features = [fname for fname in all_widget_values if fname in RANGE_HINTS and fname not in NON_ACTIONABLE_FEATURES and not fname.startswith("epwt_fg") and not fname.startswith("fg")]
 
@@ -64,6 +77,7 @@ def compute_counterfactuals(
 
         feature_range_width = base_range_width
 
+        # ── Stage 1: Wachter minimisation — minimal change to cross 0.5 ──
         def _wachter_loss(val: float, _fname=fname, _cur=current_val, _rng=feature_range_width) -> float:
             prob = _predict_for_value(_fname, val)
             pred_loss = (prob - Y_TARGET) ** 2
@@ -82,12 +96,33 @@ def compute_counterfactuals(
             continue
 
         cf_prob = _predict_for_value(fname, cf_val)
+
+        # ── Stage 2: if Wachter didn't cross 0.5, grid-search for the
+        #    value that achieves the greatest absolute risk reduction ──
+        if cf_prob >= DECISION_BOUNDARY:
+            grid = np.linspace(minimum, maximum, GRID_STEPS)
+            grid_probs = np.array([_predict_for_value(fname, v) for v in grid])
+            best_idx = int(np.argmin(grid_probs))
+            grid_best_val = float(grid[best_idx])
+            grid_best_prob = float(grid_probs[best_idx])
+            if grid_best_prob < cf_prob:
+                cf_val = grid_best_val
+                cf_prob = grid_best_prob
+
         reduction = (current_probability - cf_prob) * 100.0
 
         if reduction <= 0.05 or np.isclose(cf_val, current_val, atol=1e-3):
             continue
 
-        rows.append({"Feature": dictionary_labels.get(fname, fname), "Current Value": round(current_val, 2), "Suggested Value": round(cf_val, 2), "Current Risk": f"{current_probability * 100:.1f}%", "Projected Risk": f"{cf_prob * 100:.1f}%", "Risk Reduction": f"{reduction:.1f}%", "_delta": reduction})
+        rows.append({
+            "Feature": _display_label(fname, dictionary_labels),
+            "Current Value": round(current_val, 2),
+            "Suggested Value": round(cf_val, 2),
+            "Current Risk": f"{current_probability * 100:.1f}%",
+            "Projected Risk": f"{cf_prob * 100:.1f}%",
+            "Risk Reduction": f"{reduction:.1f}%",
+            "_delta": reduction,
+        })
 
     if not rows:
         return pd.DataFrame()
@@ -95,3 +130,4 @@ def compute_counterfactuals(
     df = pd.DataFrame(rows)
     df = df.sort_values("_delta", ascending=False).drop(columns=["_delta"]).head(top_n).reset_index(drop=True)
     return df
+

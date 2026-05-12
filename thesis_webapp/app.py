@@ -798,6 +798,40 @@ def resolve_explainability_columns(
     rendered_lc = {str(name).lower() for name in rendered_input_features}
     return [str(c) for c in model_columns if (s := _model_column_source_input_feature(str(c), input_features)) and s in rendered_lc]
 
+
+def _raw_value_for_feature(model_col: str, input_features: list[str], widget_values: dict) -> float | None:
+    """Return the user's raw widget value for a model column, or None if not found."""
+    source = _model_column_source_input_feature(model_col, input_features)
+    if source is None:
+        return None
+    # widget_values keys may be prefixed with "input_"
+    for key in (source, f"input_{source}"):
+        if key in widget_values:
+            try:
+                return float(widget_values[key])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _fmt_raw(value: float | None) -> str:
+    if value is None:
+        return "—"
+    if value == int(value):
+        return str(int(value))
+    return f"{value:.4g}"
+
+
+def _parse_lime_feature(rule: str, input_features: list[str]) -> str | None:
+    """Extract which input feature a LIME rule string refers to."""
+    rule_lc = rule.lower()
+    # Try longest match first so e.g. 'epwt_fg1' beats 'fg1'
+    for name in sorted(input_features, key=len, reverse=True):
+        if name.lower() in rule_lc:
+            return name
+    return None
+
+
 if "show_form" not in st.session_state:
     st.session_state.show_form = False
 if "scored" not in st.session_state:
@@ -855,15 +889,15 @@ if not st.session_state.show_form:
                                                     letter-spacing:0.15em;color:#64748b;margin-bottom:1rem;">Model Performance</div>
                             <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.2rem;">
                                 <div style="text-align:center;">
-                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">75.2%</div>
+                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">76.9%</div>
                                     <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Accuracy</div>
                                 </div>
                                 <div style="text-align:center;">
-                                    <div style="font-size:2rem;font-weight:800;color:#dc2626;">84.6%</div>
+                                    <div style="font-size:2rem;font-weight:800;color:#dc2626;">76.5%</div>
                                     <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Recall</div>
                                 </div>
                                 <div style="text-align:center;">
-                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">84.8%</div>
+                                    <div style="font-size:2rem;font-weight:800;color:#0f172a;">84.7%</div>
                                     <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">AUC</div>
                                 </div>
                             </div>
@@ -872,7 +906,7 @@ if not st.session_state.show_form:
                                 <strong>Recall</strong> (sensitivity) is the share of true hypertensive cases the model catches —
                                 prioritised here because missing a true positive in health screening carries greater risk than a false alarm.
                                 <strong>AUC</strong> reflects overall discriminative power across all thresholds.
-                                Metrics are from the EXP3 best model: CatBoost with class-weight balancing (base calibration, threshold 0.45) evaluated on the held-out test set.
+                                Metrics are from the best updated EXP3 run: XGBoost with class-weight balancing (base calibration) evaluated on the held-out test set.
                             </div>
                         </div>
                         """,
@@ -1319,10 +1353,10 @@ else:
                 st.info("No single-feature change was found to reduce risk further.")
             else:
                 st.caption(
-                    "Wachter-style counterfactuals: each row shows the optimal value for one actionable feature "
-                    "found by minimising a proximity-weighted loss that balances pushing the predicted probability "
-                    "below the decision boundary while staying as close as possible to the original input. "
-                    "All other features are held constant."
+                    "Each row shows the optimal value for one actionable feature that reduces hypertension risk. "
+                    "Where possible, the model finds the minimal change needed to push predicted probability below 50% "
+                    "(the decision boundary). If crossing 50% is not achievable for a feature, the suggestion instead "
+                    "shows the value that minimises risk as much as possible. All other features are held constant."
                 )
                 st.dataframe(cf_df, use_container_width=True, hide_index=True)
 
@@ -1364,13 +1398,20 @@ else:
 
         exp_a, exp_b, exp_c = st.columns(3)
 
+        _wvals_exp = st.session_state.get("_all_widget_values", {})
+        _ifnames_exp = st.session_state.get("_input_feature_names", feature_names)
+
         with exp_a:
             st.markdown("##### SHAP Local")
             if shap_error:
                 st.warning(shap_error)
             elif shap_local_df is not None and not shap_local_df.empty:
-                local_top = shap_local_df.head(12)
-                st.table(local_top[["feature", "shap_value"]])
+                local_top = shap_local_df.head(12).copy()
+                local_top["your_input"] = [
+                    _fmt_raw(_raw_value_for_feature(f, _ifnames_exp, _wvals_exp))
+                    for f in local_top["feature"]
+                ]
+                st.table(local_top[["feature", "your_input", "shap_value"]])
                 chart_df = local_top.head(10).iloc[::-1]
                 st.plotly_chart(
                     go.Figure(
@@ -1379,6 +1420,8 @@ else:
                             y=chart_df["feature"],
                             orientation="h",
                             marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["shap_value"]],
+                            customdata=chart_df["your_input"],
+                            hovertemplate="<b>%{y}</b><br>SHAP value: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
                         )
                     ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
                     use_container_width=True,
@@ -1425,8 +1468,16 @@ else:
             if lime_error:
                 st.warning(lime_error)
             elif lime_df is not None and not lime_df.empty:
-                lime_top = lime_df.head(12)
-                st.table(lime_top)
+                lime_top = lime_df.head(12).copy()
+                lime_top["your_input"] = [
+                    _fmt_raw(_raw_value_for_feature(
+                        _parse_lime_feature(r, _ifnames_exp) or r,
+                        _ifnames_exp,
+                        _wvals_exp,
+                    ))
+                    for r in lime_top["rule"]
+                ]
+                st.table(lime_top[["rule", "your_input", "weight"]])
                 chart_df = lime_top.head(10).iloc[::-1]
                 st.plotly_chart(
                     go.Figure(
@@ -1435,6 +1486,8 @@ else:
                             y=chart_df["rule"],
                             orientation="h",
                             marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["weight"]],
+                            customdata=chart_df["your_input"],
+                            hovertemplate="<b>%{y}</b><br>Weight: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
                         )
                     ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
                     use_container_width=True,

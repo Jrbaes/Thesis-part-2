@@ -14,22 +14,65 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 
 
-# ── EXP3-C bundle (CatBoost cw/base, best across EXP3 A/B/C) ────────────────
-EXP3_BUNDLE_PATH = PROJECT_ROOT / "exp3_logreg_cat" / "models" / "best_model_bundle.joblib"
+# ── Auto-select best EXP3 bundle from updated runs (A/B/C/D) ─────────────────
+_EXP3_CANDIDATES = [
+    ("exp3_knn_rf", PROJECT_ROOT / "exp3_knn_rf"),
+    ("exp3_xgb_ada", PROJECT_ROOT / "exp3_xgb_ada"),
+    ("exp3_logreg_cat", PROJECT_ROOT / "exp3_logreg_cat"),
+    ("exp3_naive_bayes", PROJECT_ROOT / "exp3_naive_bayes"),
+]
+
+
+def _select_best_exp3_bundle() -> Path | None:
+    best_path: Path | None = None
+    best_combined = -np.inf
+
+    for _, exp_dir in _EXP3_CANDIDATES:
+        bundle_path = exp_dir / "models" / "best_model_bundle.joblib"
+        post_cal_path = exp_dir / "post_calibration_results.csv"
+
+        if not bundle_path.exists() or not post_cal_path.exists():
+            continue
+
+        try:
+            top_row = pd.read_csv(post_cal_path, nrows=1)
+            if top_row.empty or "combined" not in top_row.columns:
+                continue
+            combined = float(top_row.iloc[0]["combined"])
+        except Exception:
+            continue
+
+        if combined > best_combined:
+            best_combined = combined
+            best_path = bundle_path
+
+    return best_path
+
+
+EXP3_BUNDLE_PATH = _select_best_exp3_bundle()
 
 # Fall back to old GPU-exp2 artifacts when the EXP3-C bundle has not been
 # generated yet (run the save cell in EXP3_C_LogReg_CatBoost.ipynb first).
 _OLD_MODEL_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib"
 _OLD_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
 
-DEFAULT_MODEL_PATH = EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH.exists() else _OLD_MODEL_PATH
-DEFAULT_PREPROCESSOR_PATH = EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH.exists() else _OLD_PREPROCESSOR_PATH
+# Pinned to EXP3-B (XGBoost cw base) — best recall (76.5%) across updated runs.
+_PINNED_BUNDLE = PROJECT_ROOT / "exp3_xgb_ada" / "models" / "best_model_bundle.joblib"
+
+DEFAULT_MODEL_PATH = _PINNED_BUNDLE if _PINNED_BUNDLE.exists() else (EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH is not None and EXP3_BUNDLE_PATH.exists() else _OLD_MODEL_PATH)
+DEFAULT_PREPROCESSOR_PATH = _PINNED_BUNDLE if _PINNED_BUNDLE.exists() else (EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH is not None and EXP3_BUNDLE_PATH.exists() else _OLD_PREPROCESSOR_PATH)
 
 _calibrator_candidates = [
     PROJECT_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib",
     WORKSPACE_ROOT / "main_2015_balanced_gpu_artifacts" / "models" / "venn_abers_calibrator.joblib",
 ]
-DEFAULT_CALIBRATOR_PATH = next((path for path in _calibrator_candidates if path.exists()), _calibrator_candidates[0])
+
+# EXP3 bundles already encode their selected calibration strategy in the bundle
+# metadata, so avoid applying an unrelated external calibrator by default.
+if DEFAULT_MODEL_PATH == _OLD_MODEL_PATH:
+    DEFAULT_CALIBRATOR_PATH = next((path for path in _calibrator_candidates if path.exists()), _calibrator_candidates[0])
+else:
+    DEFAULT_CALIBRATOR_PATH = PROJECT_ROOT / "__no_external_calibrator__.joblib"
 
 ONE_HOT_GROUPS = {
     "alcohol_level": ["0.0", "1.0", "2.0", "3.0", "nan"], "smoking_level": ["0.0", "1.0", "2.0", "3.0", "nan"],
