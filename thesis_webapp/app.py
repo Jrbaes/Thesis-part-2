@@ -1311,7 +1311,7 @@ else:
                 _margin = abs(result.calibrated_probability - RISK_THRESHOLD) * 100.0
                 _margin_dir = "above" if result.calibrated_probability > RISK_THRESHOLD else "below"
                 st.markdown(
-                    f"<div class='output-hero'><div class='oh-label'>Margin from Threshold</div><div class='oh-value' style='font-size:1.6rem;'>{_margin:.1f}%</div><div class='oh-sub'>{_margin:.1f} pp {_margin_dir} the {int(RISK_THRESHOLD*100)}% threshold</div></div>",
+                    f"<div class='output-hero'><div class='oh-label'>Margin from Threshold</div><div class='oh-value' style='font-size:1.6rem;'>{_margin:.1f}%</div><div class='oh-sub'>{_margin:.1f} % points {_margin_dir} the {int(RISK_THRESHOLD*100)}% threshold</div></div>",
                     unsafe_allow_html=True,
                 )
         with kpi_c:
@@ -1342,8 +1342,8 @@ else:
                         f"{result.calibrated_probability:.4f}",
                         mapped_risk_label,
                         f"{result.lower_bound*100:.1f}% – {result.upper_bound*100:.1f}%" if result.uncertainty_width > 0.001 else "N/A",
-                        f"{result.uncertainty_width*100:.1f} pp" if result.uncertainty_width > 0.001 else "N/A",
-                        f"{_margin_pp:.1f} pp {_margin_dir} threshold",
+                        f"{result.uncertainty_width*100:.1f} % points" if result.uncertainty_width > 0.001 else "N/A",
+                        f"{_margin_pp:.1f} % points {_margin_dir} threshold",
                     ],
                 }
             )
