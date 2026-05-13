@@ -43,9 +43,9 @@ def compute_counterfactuals(
     from scipy.optimize import minimize_scalar  # type: ignore
 
     LAMBDA = 0.5
-    Y_TARGET = 0.49
-    DECISION_BOUNDARY = 0.50
-    GRID_STEPS = 60  # fallback grid resolution when Wachter can't cross 0.5
+    Y_TARGET = 0.34
+    DECISION_BOUNDARY = 0.35
+    GRID_STEPS = 60  # fallback grid resolution when Wachter can't cross 0.35
 
     scan_features = [fname for fname in all_widget_values if fname in RANGE_HINTS and fname not in NON_ACTIONABLE_FEATURES and not fname.startswith("epwt_fg") and not fname.startswith("fg")]
 
@@ -130,4 +130,99 @@ def compute_counterfactuals(
     df = pd.DataFrame(rows)
     df = df.sort_values("_delta", ascending=False).drop(columns=["_delta"]).head(top_n).reset_index(drop=True)
     return df
+
+
+def compute_counterfactuals_safe(
+    model: Any,
+    preprocessor: Any,
+    calibrator: Any,
+    all_widget_values: dict,
+    input_feature_names: list[str],
+    dictionary_labels: dict[str, str],
+    current_probability: float,
+    top_n: int = 8,
+    timeout: int = 180,
+) -> pd.DataFrame:
+    """Run compute_counterfactuals in an isolated subprocess.
+
+    Prevents XGBoost's OpenMP thread pool from being initialised in the
+    Streamlit main process, which would cause os._exit() on Windows when
+    Streamlit's own threads try to run concurrently.
+
+    Falls back to in-process computation if the model cannot be pickled.
+    """
+    import pathlib
+    import pickle
+    import subprocess
+    import sys
+    import tempfile
+    import uuid
+
+    _dir = pathlib.Path(__file__).parent
+    worker = _dir / "_cf_worker.py"
+
+    # Verify everything is picklable before spawning
+    payload = {
+        "model": model,
+        "preprocessor": preprocessor,
+        "calibrator": calibrator,
+        "all_widget_values": all_widget_values,
+        "input_feature_names": input_feature_names,
+        "dictionary_labels": dictionary_labels,
+        "current_probability": current_probability,
+        "top_n": top_n,
+    }
+    try:
+        _bytes = pickle.dumps(payload)
+        del _bytes
+    except Exception:
+        # Not picklable — run in-process as fallback
+        return compute_counterfactuals(
+            model=model,
+            preprocessor=preprocessor,
+            calibrator=calibrator,
+            all_widget_values=all_widget_values,
+            input_feature_names=input_feature_names,
+            dictionary_labels=dictionary_labels,
+            current_probability=current_probability,
+            top_n=top_n,
+        )
+
+    uid = uuid.uuid4().hex
+    tmp_dir = pathlib.Path(tempfile.gettempdir())
+    tmp_in = tmp_dir / f"_cf_in_{uid}.pkl"
+    tmp_out = tmp_dir / f"_cf_out_{uid}.pkl"
+
+    try:
+        with open(tmp_in, "wb") as fh:
+            pickle.dump(payload, fh)
+
+        proc = subprocess.Popen(
+            [sys.executable, str(worker), str(tmp_in), str(tmp_out)],
+            cwd=str(_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        try:
+            returncode = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            return pd.DataFrame()
+
+        if not tmp_out.exists():
+            return pd.DataFrame()
+
+        with open(tmp_out, "rb") as fh:
+            result = pickle.load(fh)
+
+        return result if isinstance(result, pd.DataFrame) else pd.DataFrame()
+
+    finally:
+        for f in (tmp_in, tmp_out):
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                pass
 

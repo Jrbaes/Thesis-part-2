@@ -123,6 +123,32 @@ class PredictionResult:
     uncertainty_width: float
 
 
+def _compute_bootstrap_interval(
+    base_model: Any,
+    input_frame: pd.DataFrame,
+    n_samples: int = 60,
+    noise_std: float = 0.25,
+    seed: int = 42,
+) -> tuple[float, float]:
+    """Estimate a 10th–90th percentile prediction interval via input perturbation.
+
+    Adds Gaussian noise (±noise_std in model-feature / standardised space) to
+    the single input row, obtains n_samples predictions in one batched call,
+    and returns (p10, p90).  This reflects how sensitive the risk score is to
+    typical measurement uncertainty in the input features.
+    """
+    rng = np.random.default_rng(seed)
+    base = input_frame.values  # (1, n_features)
+    noise = rng.normal(0.0, noise_std, size=(n_samples, base.shape[1]))
+    perturbed = pd.DataFrame(base + noise, columns=input_frame.columns)
+    try:
+        probs = np.asarray(base_model.predict_proba(perturbed))[:, 1]
+        return float(np.percentile(probs, 10)), float(np.percentile(probs, 90))
+    except Exception:
+        p = float(np.asarray(base_model.predict_proba(input_frame))[0, 1])
+        return p, p
+
+
 class Exp3BundlePreprocessor:
     """Sklearn-compatible transformer wrapping the EXP3-C multi-step preprocessing bundle.
 
@@ -296,8 +322,9 @@ def predict_with_venn_abers(
 
         if method == "base" or wrapped_calibrator is None:
             calibrated_probability = raw_probability
-            lower_bound = raw_probability
-            upper_bound = raw_probability
+            lower_bound, upper_bound = _compute_bootstrap_interval(
+                unwrap_model(model), input_frame
+            )
         elif method in {"isotonic", "platt", "sigmoid"}:
             calibrated_probability = float(np.clip(wrapped_calibrator.predict(np.array([raw_probability]))[0], 0.0, 1.0))
             lower_bound = calibrated_probability
@@ -328,6 +355,76 @@ def predict_with_venn_abers(
         upper_bound=raw_probability,
         uncertainty_width=0.0,
     )
+
+
+def predict_with_venn_abers_safe(
+    model: Any,
+    input_frame: "pd.DataFrame",
+    calibrator: Any | None = None,
+    timeout: int = 60,
+) -> "PredictionResult":
+    """Run predict_with_venn_abers in an isolated subprocess.
+
+    Prevents XGBoost's OpenMP thread pool from being initialised in the
+    Streamlit main process, which would cause os._exit() on Windows when
+    Streamlit's own threads try to run concurrently.
+
+    Falls back to in-process prediction if the payload cannot be pickled.
+    """
+    import pathlib
+    import pickle
+    import subprocess
+    import sys
+    import tempfile
+    import uuid
+
+    _dir = pathlib.Path(__file__).parent
+    worker = _dir / "_predict_worker.py"
+
+    payload = {"model": model, "input_frame": input_frame, "calibrator": calibrator}
+    try:
+        _bytes = pickle.dumps(payload)
+        del _bytes
+    except Exception:
+        return predict_with_venn_abers(model, input_frame, calibrator)
+
+    uid = uuid.uuid4().hex
+    tmp_dir = pathlib.Path(tempfile.gettempdir())
+    tmp_in = tmp_dir / f"_pred_in_{uid}.pkl"
+    tmp_out = tmp_dir / f"_pred_out_{uid}.pkl"
+
+    try:
+        with open(tmp_in, "wb") as fh:
+            pickle.dump(payload, fh)
+
+        proc = subprocess.Popen(
+            [sys.executable, str(worker), str(tmp_in), str(tmp_out)],
+            cwd=str(_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+        try:
+            returncode = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            return predict_with_venn_abers(model, input_frame, calibrator)
+
+        if not tmp_out.exists():
+            return predict_with_venn_abers(model, input_frame, calibrator)
+
+        with open(tmp_out, "rb") as fh:
+            result = pickle.load(fh)
+
+        return result
+
+    finally:
+        for f in (tmp_in, tmp_out):
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def feature_default(feature_name: str) -> float:

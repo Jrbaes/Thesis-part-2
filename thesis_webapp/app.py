@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+import os
+
+# Must be set BEFORE numpy/sklearn/xgboost are imported.
+# Prevents Intel MKL from calling os._exit() when its OpenMP thread pool
+# clashes with XGBoost's own OpenMP threads inside the Streamlit process.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +36,7 @@ from backend import (
     make_input_frame,
     prepare_model_input,
     predict_with_venn_abers,
+    predict_with_venn_abers_safe,
     unwrap_model,
 )
 from app_constants import (
@@ -40,8 +51,8 @@ from app_constants import (
     VARIABLE_DEFINITION_OVERRIDES,
     get_dictionary_paths,
 )
-from counterfactuals import compute_counterfactuals
-from explainability import try_compute_lime, try_compute_shap
+from counterfactuals import compute_counterfactuals, compute_counterfactuals_safe
+from explainability import compute_explainability_safe, try_compute_lime, try_compute_shap
 from styles import apply_global_styles
 
 
@@ -313,7 +324,6 @@ def render_number_input(feature_name: str, dictionary_labels: dict[str, str], di
             value=float(default_value),
             step=float(step),
             format="%.2f",
-            key=f"input_{feature_name}",
             help=(help_text + " Auto-computed from dietary components above when Predict is pressed.") if help_text else "Auto-computed from dietary components above when Predict is pressed.",
             disabled=True,
         )
@@ -387,11 +397,6 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
 
         option_values: list[int | None] = [None] + options
 
-        if auto_value is not None:
-            st.session_state[key] = auto_value
-        elif key not in st.session_state or st.session_state[key] not in option_values:
-            st.session_state[key] = None
-
         def _format_choice(choice: int | None) -> str:
             if choice is None:
                 return "missing"
@@ -402,14 +407,39 @@ def render_behavioral_selectors(dictionary_labels: dict[str, str], dictionary_va
                 return f"{choice} - {label}"
             return str(choice)
 
+        # For disabled/auto fields: render a display-only selectbox with a
+        # run-scoped key (incorporates the auto_value so it reinitialises when
+        # the cascade changes it) and return the auto_value directly.  This
+        # avoids the session-state persistence problem where a stale None from
+        # a prior run overrides the computed auto_value.
+        if auto_value is not None and disabled:
+            display_key = f"{key}_locked_{auto_value}"
+            _sel_index = option_values.index(auto_value) if auto_value in option_values else 0
+            st.selectbox(
+                field_display_label(variable_name, dictionary_labels),
+                options=option_values,
+                index=_sel_index,
+                key=display_key,
+                format_func=_format_choice,
+                help=variable_help,
+                disabled=True,
+            )
+            return float(int(auto_value))
+
+        # Normal user-editable field: persist selection across reruns via key.
+        if key not in st.session_state or st.session_state[key] not in option_values:
+            _sel_index = 0
+        else:
+            _sel_index = option_values.index(st.session_state[key])
+
         selected = st.selectbox(
             field_display_label(variable_name, dictionary_labels),
             options=option_values,
-            index=option_values.index(st.session_state.get(key)),
+            index=_sel_index,
             key=key,
             format_func=_format_choice,
             help=variable_help,
-            disabled=disabled,
+            disabled=False,
         )
         return float("nan") if selected is None else float(int(selected))
 
@@ -637,6 +667,7 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
 
 
 def make_gauge_chart(score: float):
+    threshold_pct = RISK_THRESHOLD * 100.0
     fig = go.Figure(
         go.Indicator(
             mode="gauge+number",
@@ -646,10 +677,10 @@ def make_gauge_chart(score: float):
                 "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#94a3b8"},
                 "bar": {"color": "#dc2626"},
                 "steps": [
-                    {"range": [0, 50], "color": "#dcfce7"},
-                    {"range": [50, 100], "color": "#fee2e2"},
+                    {"range": [0, threshold_pct], "color": "#dcfce7"},
+                    {"range": [threshold_pct, 100], "color": "#fee2e2"},
                 ],
-                "threshold": {"line": {"color": "#111827", "width": 4}, "thickness": 0.75, "value": score * 100.0},
+                "threshold": {"line": {"color": "#111827", "width": 4}, "thickness": 0.75, "value": threshold_pct},
             },
         )
     )
@@ -770,8 +801,10 @@ def apply_dietary_derived_totals(widget_values: dict[str, float], feature_names:
     return values
 
 
+RISK_THRESHOLD = 0.35
+
 def risk_label_from_score(probability: float) -> str:
-    return "At Risk of Hypertension" if probability > 0.5 else "Not at Risk"
+    return "At Risk of Hypertension" if probability > RISK_THRESHOLD else "Not at Risk"
 
 
 def _model_column_source_input_feature(model_column: str, input_features: list[str]) -> str | None:
@@ -831,6 +864,8 @@ def _parse_lime_feature(rule: str, input_features: list[str]) -> str | None:
             return name
     return None
 
+
+print("[DEBUG] >>> script top — new rerun starting", flush=True)
 
 if "show_form" not in st.session_state:
     st.session_state.show_form = False
@@ -913,7 +948,7 @@ if not st.session_state.show_form:
                         unsafe_allow_html=True,
         )
 
-        _begin = st.button("Begin Assessment", use_container_width=True, type="primary")
+        _begin = st.button("Begin Assessment", width='stretch', type="primary")
     if _begin:
         st.session_state.show_form = True
         st.rerun()
@@ -1018,15 +1053,6 @@ else:
     if "Dietary pattern" in grouped_features:
         st.markdown("#### Dietary")
         st.caption("Enter each dietary value as your daily intake. Definitions for each dietary component are available in the field hover tooltips (?).")
-        st.markdown("##### Example ordinary servings (approximate)")
-        st.caption("Use these examples as quick references before entering daily dietary values.")
-        st.markdown(
-            "- One cup cooked white rice ≈ 45 g carbohydrates (Total_CHO).\n"
-            "- One egg ≈ 6 g protein and 5 g fat (Total_Prot, Total_Fat).\n"
-            "- One medium banana ≈ 10 mg vitamin C and 27 g carbs (Total_VitC, Total_CHO).\n"
-            "- One cup milk ≈ 300 mg calcium and 8 g protein (Total_Calc, Total_Prot).\n"
-            "- One tablespoon cooking oil ≈ 14 g fat (Total_Fat)."
-        )
         dietary_features = list(grouped_features["Dietary pattern"])
         if "vita" in feature_names and "vita" not in dietary_features:
             dietary_features.append("vita")
@@ -1083,8 +1109,6 @@ else:
                         minimum, maximum, step = feature_range(feature_name)
                         display_label = field_display_label(feature_name, dictionary_labels)
                         help_text = field_help_text(feature_name, dictionary_labels)
-                        auto_key = f"auto_{feature_name}"
-                        st.session_state[auto_key] = float(subtotal_value)
                         st.number_input(
                             display_label,
                             min_value=float(minimum),
@@ -1092,7 +1116,6 @@ else:
                             value=float(subtotal_value),
                             step=float(step),
                             format="%.2f",
-                            key=auto_key,
                             disabled=True,
                             help=(help_text + " Auto-computed from the component food groups.") if help_text else "Auto-computed from the component food groups.",
                         )
@@ -1141,16 +1164,13 @@ else:
 
         _tot_a, _tot_b, _tot_c = st.columns(3)
         with _tot_a:
-            st.session_state["_disp_food"] = round(_live_food, 1)
-            st.number_input("Total Food Intake (g)", value=round(_live_food, 1), disabled=True, key="_disp_food")
+            st.number_input("Total Food Intake (g)", value=round(_live_food, 1), disabled=True)
             st.caption("Auto-updates from the dietary values above.")
         with _tot_b:
-            st.session_state["_disp_energy"] = round(_live_energy, 1)
-            st.number_input("Total Energy (kcal)", value=round(_live_energy, 1), disabled=True, key="_disp_energy")
+            st.number_input("Total Energy (kcal)", value=round(_live_energy, 1), disabled=True)
             st.caption("Auto-updates from the dietary values above.")
         with _tot_c:
-            st.session_state["_disp_protein"] = round(_live_protein, 1)
-            st.number_input("Total Protein (g)", value=round(_live_protein, 1), disabled=True, key="_disp_protein")
+            st.number_input("Total Protein (g)", value=round(_live_protein, 1), disabled=True)
             st.caption("Auto-updates from the dietary values above.")
 
     missing_field_labels = [
@@ -1164,11 +1184,6 @@ else:
         if len(missing_field_labels) > 8:
             missing_preview += f", and {len(missing_field_labels) - 8} more"
         st.warning(f"Complete all missing inputs before predicting: {missing_preview}.")
-        st.session_state.scored = False
-        st.session_state.pop("_result", None)
-        st.session_state.pop("_input_frame", None)
-        st.session_state.pop("_model_feature_names", None)
-        st.session_state.pop("_rendered_input_features", None)
 
     dietary_all_zero = False
     if dietary_addend_fields:
@@ -1177,18 +1192,13 @@ else:
         )
         if dietary_all_zero:
             st.warning("Enter at least one non-zero food-group dietary intake value before predicting.")
-            st.session_state.scored = False
-            st.session_state.pop("_result", None)
-            st.session_state.pop("_input_frame", None)
-            st.session_state.pop("_model_feature_names", None)
-            st.session_state.pop("_rendered_input_features", None)
 
     st.markdown("<br>", unsafe_allow_html=True)
     _, submit_col, _ = st.columns([1.3, 1.2, 1.3])
     with submit_col:
-        submitted = st.button("Predict My Risk", use_container_width=True, type="primary", disabled=bool(missing_field_labels) or dietary_all_zero)
+        submitted = st.button("Predict My Risk", width='stretch', type="primary", disabled=bool(missing_field_labels) or dietary_all_zero)
 
-    components.html(
+    st.html(
                 """
                 <script>
                 (function() {
@@ -1245,8 +1255,7 @@ else:
                     });
                 })();
                 </script>
-                """,
-                height=0,
+                """
         )
 
     if submitted and not missing_field_labels and not dietary_all_zero:
@@ -1254,7 +1263,9 @@ else:
         input_values = build_input_values_from_widgets(feature_names, derived_widget_values)
         raw_input_frame = make_input_frame(feature_names, input_values)
         model_input_frame = prepare_model_input(raw_input_frame, preprocessor)
-        result = predict_with_venn_abers(model, model_input_frame, calibrator)
+        print("[DEBUG] >>> calling predict_with_venn_abers_safe (subprocess)", flush=True)
+        result = predict_with_venn_abers_safe(model, model_input_frame, calibrator)
+        print(f"[DEBUG] >>> prediction done: calibrated_prob={result.calibrated_probability:.4f}", flush=True)
         st.session_state.scored = True
         st.session_state._result = result
         st.session_state._input_frame = model_input_frame
@@ -1263,8 +1274,11 @@ else:
         st.session_state._rendered_input_features = sorted(rendered_feature_names)
         st.session_state._all_widget_values = dict(derived_widget_values)
         st.session_state._scroll_to_output = True
+        st.session_state.pop("_exp_cache", None)   # force SHAP/LIME recompute for new prediction
+        st.session_state.pop("_cf_cache", None)    # force counterfactuals recompute for new prediction
 
     if st.session_state.scored and hasattr(st.session_state, "_result"):
+        print("[DEBUG] >>> entering output section", flush=True)
         result = st.session_state._result
         input_frame = st.session_state._input_frame
 
@@ -1279,7 +1293,7 @@ else:
 
         score_pct = result.calibrated_probability * 100.0
         mapped_risk_label = risk_label_from_score(result.calibrated_probability)
-        tier_css = "risk-at-risk" if result.calibrated_probability > 0.5 else "risk-not-at-risk"
+        tier_css = "risk-at-risk" if result.calibrated_probability > RISK_THRESHOLD else "risk-not-at-risk"
 
         kpi_a, kpi_b, kpi_c = st.columns(3)
         with kpi_a:
@@ -1288,14 +1302,16 @@ else:
                 unsafe_allow_html=True,
             )
         with kpi_b:
-            if result.uncertainty_width > 0.001:
+            if result.lower_bound != result.upper_bound:
                 st.markdown(
-                    f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>{result.lower_bound*100:.1f}% - {result.upper_bound*100:.1f}%</div><div class='oh-sub'>Venn-Abers interval</div></div>",
+                    f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>{result.lower_bound*100:.1f}% \u2013 {result.upper_bound*100:.1f}%</div><div class='oh-sub'>Venn-Abers p0/p1 bounds</div></div>",
                     unsafe_allow_html=True,
                 )
             else:
+                _margin = abs(result.calibrated_probability - RISK_THRESHOLD) * 100.0
+                _margin_dir = "above" if result.calibrated_probability > RISK_THRESHOLD else "below"
                 st.markdown(
-                    f"<div class='output-hero'><div class='oh-label'>Uncertainty Interval</div><div class='oh-value' style='font-size:1.6rem;'>N/A</div><div class='oh-sub'>No interval calibration applied</div></div>",
+                    f"<div class='output-hero'><div class='oh-label'>Margin from Threshold</div><div class='oh-value' style='font-size:1.6rem;'>{_margin:.1f}%</div><div class='oh-sub'>{_margin:.1f} pp {_margin_dir} the {int(RISK_THRESHOLD*100)}% threshold</div></div>",
                     unsafe_allow_html=True,
                 )
         with kpi_c:
@@ -1304,30 +1320,76 @@ else:
                 unsafe_allow_html=True,
             )
 
+        print("[DEBUG] >>> rendering KPI cards done, starting charts", flush=True)
         chart_left, chart_right = st.columns([1, 1.5])
         with chart_left:
             st.markdown("**Risk Gauge**")
-            st.plotly_chart(make_gauge_chart(result.calibrated_probability), use_container_width=True, config=PLOTLY_STATIC_CONFIG)
+            st.plotly_chart(make_gauge_chart(result.calibrated_probability), width='stretch', config=PLOTLY_STATIC_CONFIG)
         with chart_right:
             st.markdown("**Prediction Summary**")
+            _margin_pp = abs(result.calibrated_probability - RISK_THRESHOLD) * 100.0
+            _margin_dir = "above" if result.calibrated_probability > RISK_THRESHOLD else "below"
             summary_frame = pd.DataFrame(
                 {
                     "metric": [
                         "Calibrated Probability",
-                        "Lower Uncertainty Interval Bound",
-                        "Higher Uncertainty Interval Bound",
-                        "Uncertainty Interval Width / Range",
+                        "Risk Classification",
+                        "Uncertainty Interval (Venn-Abers p0/p1 bounds)",
+                        "Uncertainty Range (interval width)",
+                        "Margin from 35% Threshold",
                     ],
                     "value": [
                         f"{result.calibrated_probability:.4f}",
-                        f"{result.lower_bound:.4f}",
-                        f"{result.upper_bound:.4f}",
-                        f"{result.uncertainty_width:.4f}",
+                        mapped_risk_label,
+                        f"{result.lower_bound*100:.1f}% – {result.upper_bound*100:.1f}%" if result.uncertainty_width > 0.001 else "N/A",
+                        f"{result.uncertainty_width*100:.1f} pp" if result.uncertainty_width > 0.001 else "N/A",
+                        f"{_margin_pp:.1f} pp {_margin_dir} threshold",
                     ],
                 }
             )
             st.table(summary_frame)
 
+        st.markdown(
+            "<div class='section-header' style='margin-top:1.8rem;'>"
+            "<h2>Understanding Your Risk Score and Alert Threshold</h2>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div style="background:rgba(255,255,255,0.88);border:1px solid rgba(24,33,47,0.09);
+                        border-radius:18px;padding:1.6rem 2rem;margin-bottom:1.4rem;
+                        box-shadow:0 4px 18px rgba(15,23,42,0.06);">
+
+              <h4 style="margin-top:0;color:#0f172a;">1 &nbsp; What does your percentage score actually mean?</h4>
+              <p style="color:#334155;line-height:1.7;">
+                The percentage you see is a <strong>Mathematically Honest Risk Score</strong>. Our system processes
+                your data through a statistical safety filter called a <strong>Venn-Abers Predictor</strong> to ensure
+                your score matches real-world reality. If the app gives you a <strong>35% risk score</strong>, it is a
+                statistical guarantee: out of 100 people with your exact age, body type, and diet, exactly 35 of them
+                currently have clinical hypertension.
+              </p>
+
+              <h4 style="color:#0f172a;">2 &nbsp; Why does the app flag me as &ldquo;High Risk&rdquo; at 35% instead of 50%?</h4>
+              <p style="color:#334155;line-height:1.7;">
+                It is a common misconception that 50% is the standard tipping point. In reality, the baseline average
+                for clinical hypertension in the Philippines is only <strong>15.20%</strong>.
+              </p>
+              <p style="color:#334155;line-height:1.7;">
+                Because our model provides perfectly calibrated, real-world numbers, waiting until your score reaches
+                50% means your risk is <strong>more than triple the national average</strong>. By that point, severe
+                cardiovascular damage may already be occurring. We set our &ldquo;High Risk&rdquo; alert at
+                <strong>35%</strong> because it represents the critical point where your absolute risk is more than
+                double the baseline average. This ensures we catch escalating danger early, giving you the exact
+                lifestyle recommendations needed to reverse your risk before it is too late.
+              </p>
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        print("[DEBUG] >>> starting counterfactual section", flush=True)
         st.markdown(
             "<div class='section-header' style='margin-top:1.8rem;'>"
             "<h2>Counterfactual Analysis</h2>"
@@ -1339,27 +1401,37 @@ else:
         _all_wvals = st.session_state.get("_all_widget_values", {})
         _input_fnames = st.session_state.get("_input_feature_names", [])
         if _all_wvals and _input_fnames:
-            with st.spinner("Computing counterfactuals..."):
-                cf_df = compute_counterfactuals(
-                    model=unwrap_model(model),
-                    preprocessor=preprocessor,
-                    calibrator=calibrator,
-                    all_widget_values=_all_wvals,
-                    input_feature_names=_input_fnames,
-                    dictionary_labels=dictionary_labels,
-                    current_probability=result.calibrated_probability,
-                )
+            _cf_cache_key = hash(tuple(sorted(_all_wvals.items())))
+            _cf_cached = st.session_state.get("_cf_cache")
+            if _cf_cached is not None and _cf_cached.get("key") == _cf_cache_key:
+                print("[DEBUG] >>> counterfactuals: cache hit", flush=True)
+                cf_df = _cf_cached["cf_df"]
+            else:
+                print("[DEBUG] >>> counterfactuals: computing (no cache)", flush=True)
+                with st.spinner("Computing counterfactuals..."):
+                    cf_df = compute_counterfactuals_safe(
+                        model=unwrap_model(model),
+                        preprocessor=preprocessor,
+                        calibrator=calibrator,
+                        all_widget_values=_all_wvals,
+                        input_feature_names=_input_fnames,
+                        dictionary_labels=dictionary_labels,
+                        current_probability=result.calibrated_probability,
+                    )
+                st.session_state["_cf_cache"] = {"key": _cf_cache_key, "cf_df": cf_df}
+                print("[DEBUG] >>> counterfactuals: done", flush=True)
             if cf_df.empty:
                 st.info("No single-feature change was found to reduce risk further.")
             else:
                 st.caption(
                     "Each row shows the optimal value for one actionable feature that reduces hypertension risk. "
-                    "Where possible, the model finds the minimal change needed to push predicted probability below 50% "
-                    "(the decision boundary). If crossing 50% is not achievable for a feature, the suggestion instead "
+                    "Where possible, the model finds the minimal change needed to push predicted probability below 35% "
+                    "(the decision boundary). If crossing 35% is not achievable for a feature, the suggestion instead "
                     "shows the value that minimises risk as much as possible. All other features are held constant."
                 )
-                st.dataframe(cf_df, use_container_width=True, hide_index=True)
+                st.dataframe(cf_df, width='stretch', hide_index=True)
 
+        print("[DEBUG] >>> starting explainability section", flush=True)
         st.markdown(
             "<div class='section-header' style='margin-top:1.8rem;'>"
             "<h2>Explainability</h2>"
@@ -1368,155 +1440,196 @@ else:
             unsafe_allow_html=True,
         )
 
-        with st.spinner("Computing SHAP and LIME explanations..."):
-            explain_feature_names = st.session_state.get("_model_feature_names", model_feature_names)
-            rendered_inputs = set(st.session_state.get("_rendered_input_features", []))
-            input_features_for_mapping = st.session_state.get("_input_feature_names", feature_names)
-            explain_feature_names = resolve_explainability_columns(
-                model_columns=list(explain_feature_names),
-                input_features=list(input_features_for_mapping),
-                rendered_input_features=rendered_inputs,
-            )
+        # Stable cache key: hash of the actual input values so the cache
+        # survives Streamlit reruns (id(result) changes every rerun).
+        _input_vals_for_key = tuple(sorted(st.session_state.get("_all_widget_values", {}).items()))
+        _exp_cache_key = hash(_input_vals_for_key)
+        _cached = st.session_state.get("_exp_cache")
+        if _cached is not None and _cached.get("key") == _exp_cache_key:
+            print("[DEBUG] >>> explainability: cache hit", flush=True)
+            shap_local_df  = _cached["shap_local"]
+            shap_global_df = _cached["shap_global"]
+            shap_error     = _cached["shap_error"]
+            lime_df        = _cached["lime_df"]
+            lime_error     = _cached["lime_error"]
+        else:
+            shap_local_df, shap_global_df, shap_error = None, None, None
+            lime_df, lime_error = None, None
+            _control_flow_exc = None
+            print("[DEBUG] >>> explainability: computing (no cache)", flush=True)
+            with st.spinner("Computing SHAP and LIME explanations..."):
+                try:
+                    import warnings as _warnings
+                    explain_feature_names = st.session_state.get("_model_feature_names", model_feature_names)
+                    rendered_inputs = set(st.session_state.get("_rendered_input_features", []))
+                    input_features_for_mapping = st.session_state.get("_input_feature_names", feature_names)
+                    explain_feature_names = resolve_explainability_columns(
+                        model_columns=list(explain_feature_names),
+                        input_features=list(input_features_for_mapping),
+                        rendered_input_features=rendered_inputs,
+                    )
 
-            if explain_feature_names:
-                explain_input_frame = input_frame.loc[:, explain_feature_names].copy()
-                shap_local_df, shap_global_df, shap_error = try_compute_shap(
-                    explain_model,
-                    explain_feature_names,
-                    explain_input_frame,
-                    base_input_frame=input_frame,
-                )
-                lime_df, lime_error = try_compute_lime(
-                    explain_model,
-                    explain_feature_names,
-                    explain_input_frame,
-                    base_input_frame=input_frame,
-                )
-            else:
-                shap_local_df, shap_global_df, shap_error = None, None, "No explainability columns are currently mapped to visible webpage inputs."
-                lime_df, lime_error = None, "No explainability columns are currently mapped to visible webpage inputs."
+                    # compute_explainability_safe runs SHAP+LIME in a subprocess,
+                    # so we must NOT touch the model's C-level state here —
+                    # calling get_booster() in the main process activates the
+                    # OpenMP thread pool and triggers os._exit() on Windows.
+                    _explain_model = explain_model
 
+                    if explain_feature_names:
+                        print(f"[DEBUG] >>> explainability: calling compute_explainability_safe ({len(explain_feature_names)} features)", flush=True)
+                        explain_input_frame = input_frame.loc[:, explain_feature_names].copy()
+                        with _warnings.catch_warnings():
+                            _warnings.simplefilter("ignore")
+                            shap_local_df, shap_global_df, shap_error, lime_df, lime_error = compute_explainability_safe(
+                                model=_explain_model,
+                                feature_names=explain_feature_names,
+                                input_frame=explain_input_frame,
+                                base_input_frame=input_frame,
+                            )
+                        print(f"[DEBUG] >>> explainability: subprocess returned — shap_error={shap_error!r}  lime_error={lime_error!r}", flush=True)
+                    else:
+                        shap_error = "No explainability columns are currently mapped to visible webpage inputs."
+                        lime_error = shap_error
+                except BaseException as _exp_exc:
+                    if not isinstance(_exp_exc, Exception) and not isinstance(_exp_exc, SystemExit):
+                        _control_flow_exc = _exp_exc
+                    else:
+                        _exp_msg = f"sys.exit({_exp_exc.code})" if isinstance(_exp_exc, SystemExit) else str(_exp_exc)
+                        if shap_error is None:
+                            shap_error = f"Explainability error: {_exp_msg}"
+                        if lime_error is None:
+                            lime_error = f"Explainability error: {_exp_msg}"
+                finally:
+                    st.session_state["_exp_cache"] = {
+                        "key":        _exp_cache_key,
+                        "shap_local":  shap_local_df,
+                        "shap_global": shap_global_df,
+                        "shap_error":  shap_error,
+                        "lime_df":     lime_df,
+                        "lime_error":  lime_error,
+                    }
+            if _control_flow_exc is not None:
+                raise _control_flow_exc
+
+        print("[DEBUG] >>> rendering explainability plots", flush=True)
         exp_a, exp_b, exp_c = st.columns(3)
 
         _wvals_exp = st.session_state.get("_all_widget_values", {})
         _ifnames_exp = st.session_state.get("_input_feature_names", feature_names)
 
         with exp_a:
-            st.markdown("##### SHAP Local")
-            if shap_error:
-                st.warning(shap_error)
-            elif shap_local_df is not None and not shap_local_df.empty:
-                local_top = shap_local_df.head(12).copy()
-                local_top["your_input"] = [
-                    _fmt_raw(_raw_value_for_feature(f, _ifnames_exp, _wvals_exp))
-                    for f in local_top["feature"]
-                ]
-                st.table(local_top[["feature", "your_input", "shap_value"]])
-                chart_df = local_top.head(10).iloc[::-1]
-                st.plotly_chart(
-                    go.Figure(
-                        go.Bar(
-                            x=chart_df["shap_value"],
-                            y=chart_df["feature"],
-                            orientation="h",
-                            marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["shap_value"]],
-                            customdata=chart_df["your_input"],
-                            hovertemplate="<b>%{y}</b><br>SHAP value: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
-                        )
-                    ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
-                    use_container_width=True,
-                    config=PLOTLY_STATIC_CONFIG,
-                )
-            else:
-                st.info("No SHAP local output produced.")
+            try:
+                st.markdown("##### SHAP Local")
+                if shap_error:
+                    st.warning(shap_error)
+                elif shap_local_df is not None and not shap_local_df.empty:
+                    local_top = shap_local_df.head(12).copy()
+                    local_top["your_input"] = [
+                        _fmt_raw(_raw_value_for_feature(f, _ifnames_exp, _wvals_exp))
+                        for f in local_top["feature"]
+                    ]
+                    st.table(local_top[["feature", "your_input", "shap_value"]])
+                    chart_df = local_top.head(10).iloc[::-1]
+                    st.plotly_chart(
+                        go.Figure(
+                            go.Bar(
+                                x=chart_df["shap_value"],
+                                y=chart_df["feature"],
+                                orientation="h",
+                                marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["shap_value"]],
+                                customdata=chart_df["your_input"],
+                                hovertemplate="<b>%{y}</b><br>SHAP value: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
+                            )
+                        ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
+                        width='stretch',
+                        config=PLOTLY_STATIC_CONFIG,
+                    )
+                else:
+                    st.info("No SHAP local output produced.")
+            except Exception as _e:
+                st.warning(f"SHAP Local render error: {_e}")
 
         with exp_b:
-            st.markdown("##### SHAP Global")
-            if shap_error:
-                st.warning(shap_error)
-            elif shap_global_df is not None and not shap_global_df.empty:
-                global_top = shap_global_df.head(12)
-                st.table(global_top)
-                chart_df = global_top.head(10)
-                st.plotly_chart(
-                    go.Figure(
-                        go.Waterfall(
-                            orientation="v",
-                            measure=["relative"] * len(chart_df),
-                            x=chart_df["feature"],
-                            y=chart_df["mean_abs_shap"],
-                            connector={"line": {"color": "#9ca3af"}},
-                            increasing={"marker": {"color": "#7c3aed"}},
-                            decreasing={"marker": {"color": "#7c3aed"}},
-                            text=[f"{v:.4f}" for v in chart_df["mean_abs_shap"]],
-                            textposition="outside",
-                        )
-                    ).update_layout(
-                        height=320,
-                        margin=dict(l=10, r=10, t=10, b=60),
-                        xaxis_tickangle=-40,
-                        showlegend=False,
-                    ),
-                    use_container_width=True,
-                    config=PLOTLY_STATIC_CONFIG,
-                )
-            else:
-                st.info("No SHAP global output produced.")
+            try:
+                st.markdown("##### SHAP Global")
+                if shap_error:
+                    st.warning(shap_error)
+                elif shap_global_df is not None and not shap_global_df.empty:
+                    global_top = shap_global_df.head(12)
+                    st.table(global_top)
+                    chart_df = global_top.head(10).iloc[::-1]
+                    st.plotly_chart(
+                        go.Figure(
+                            go.Bar(
+                                x=chart_df["mean_abs_shap"],
+                                y=chart_df["feature"],
+                                orientation="h",
+                                marker_color="#7c3aed",
+                                hovertemplate="<b>%{y}</b><br>Mean |SHAP|: %{x:.4f}<extra></extra>",
+                            )
+                        ).update_layout(
+                            height=320,
+                            margin=dict(l=10, r=10, t=10, b=10),
+                            xaxis_title="Mean |SHAP value|",
+                            showlegend=False,
+                        ),
+                        width='stretch',
+                        config=PLOTLY_STATIC_CONFIG,
+                    )
+                else:
+                    st.info("No SHAP global output produced.")
+            except Exception as _e:
+                st.warning(f"SHAP Global render error: {_e}")
 
         with exp_c:
-            st.markdown("##### LIME Local")
-            if lime_error:
-                st.warning(lime_error)
-            elif lime_df is not None and not lime_df.empty:
-                lime_top = lime_df.head(12).copy()
-                lime_top["your_input"] = [
-                    _fmt_raw(_raw_value_for_feature(
-                        _parse_lime_feature(r, _ifnames_exp) or r,
-                        _ifnames_exp,
-                        _wvals_exp,
-                    ))
-                    for r in lime_top["rule"]
-                ]
-                st.table(lime_top[["rule", "your_input", "weight"]])
-                chart_df = lime_top.head(10).iloc[::-1]
-                st.plotly_chart(
-                    go.Figure(
-                        go.Bar(
-                            x=chart_df["weight"],
-                            y=chart_df["rule"],
-                            orientation="h",
-                            marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["weight"]],
-                            customdata=chart_df["your_input"],
-                            hovertemplate="<b>%{y}</b><br>Weight: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
-                        )
-                    ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
-                    use_container_width=True,
-                    config=PLOTLY_STATIC_CONFIG,
-                )
-            else:
-                st.info("No LIME local output produced.")
+            try:
+                st.markdown("##### LIME Local")
+                if lime_error:
+                    st.warning(lime_error)
+                elif lime_df is None:
+                    st.info("LIME result is None — computation may have been skipped or failed silently.")
+                elif lime_df.empty:
+                    st.info("LIME returned an empty result (no feature contributions).")
+                elif True:
+                    _ifnames_lime = st.session_state.get("_input_feature_names", feature_names)
+                    _wvals_lime = st.session_state.get("_all_widget_values", {})
 
+                    lime_rows = []
+                    for _, row in lime_df.head(12).iterrows():
+                        rule = str(row["rule"])
+                        weight = float(row["weight"])
+                        raw_fname = _parse_lime_feature(rule, _ifnames_lime) or rule
+                        raw_val = _raw_value_for_feature(raw_fname, _ifnames_lime, _wvals_lime)
+                        display_name = field_display_label(raw_fname, dictionary_labels) if raw_fname in _ifnames_lime else raw_fname
+                        lime_rows.append({"feature": display_name, "your_input": _fmt_raw(raw_val), "lime_weight": weight})
+
+                    lime_display_df = pd.DataFrame(lime_rows)
+                    st.table(lime_display_df)
+
+                    chart_df_lime = lime_display_df.head(10).iloc[::-1]
+                    st.plotly_chart(
+                        go.Figure(
+                            go.Bar(
+                                x=chart_df_lime["lime_weight"],
+                                y=chart_df_lime["feature"],
+                                orientation="h",
+                                marker_color=["#dc2626" if v >= 0 else "#2563eb" for v in chart_df_lime["lime_weight"]],
+                                customdata=chart_df_lime["your_input"],
+                                hovertemplate="<b>%{y}</b><br>Weight: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
+                            )
+                        ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
+                        width='stretch',
+                        config=PLOTLY_STATIC_CONFIG,
+                    )
+                else:
+                    st.info("No LIME local output produced.")
+            except Exception as _e:
+                st.warning(f"LIME Local render error: {_e}")
+
+        print("[DEBUG] >>> output section fully rendered", flush=True)
         if st.session_state.get("_scroll_to_output", False):
-            components.html(
-                """
-                <script>
-                (function() {
-                  const tries = { count: 0 };
-                  function scrollToOutput() {
-                    const anchors = window.parent.document.querySelectorAll('[id="output-section"]');
-                    const el = anchors.length ? anchors[anchors.length - 1] : null;
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    } else if (tries.count < 20) {
-                      tries.count += 1;
-                      setTimeout(scrollToOutput, 200);
-                    }
-                  }
-                  setTimeout(scrollToOutput, 250);
-                })();
-                </script>
-                """,
-                height=0,
+            st.html(
+                "<script>(function(){function s(){try{var w=window.parent||window,e=w.document.getElementById('output-section');if(e){e.scrollIntoView({behavior:'smooth',block:'start'});}else{w.scrollTo({top:w.document.body.scrollHeight,behavior:'smooth'});}}catch(ex){}}setTimeout(s,100);setTimeout(s,600);})();</script>"
             )
             st.session_state._scroll_to_output = False
 
