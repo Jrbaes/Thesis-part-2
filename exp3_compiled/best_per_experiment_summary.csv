@@ -1,5 +1,0 @@
-experiment,rank,sampling,model,calibration,accuracy,recall,precision,f1,auc,logloss,ece,combined,exp_model
-A · KNN / RF,1,cw,randomforest,base,0.7968,0.6774,0.4005,0.5034,0.8487,0.3691,0.1171,0.747,A · randomforest
-B · XGBoost / AdaBoost,1,cw,xgboost,base,0.7687,0.7651,0.3729,0.5014,0.8469,0.4118,0.1493,0.743175,B · xgboost
-C · LogReg / CatBoost,1,smote,catboost,base,0.7521,0.7822,0.3564,0.4897,0.8375,0.4139,0.1577,0.740675,C · catboost
-D · Naïve Bayes,1,base,naive_bayes,base,0.7463,0.73,0.3429,0.4666,0.8075,0.7084,0.1859,0.6455,D · naive_bayes
