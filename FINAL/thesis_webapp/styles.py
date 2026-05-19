@@ -84,7 +84,9 @@ APP_CSS = """
             radial-gradient(circle at 82% 18%, rgba(37,99,235,0.22) 0%, transparent 44%);
         pointer-events: none;
     }
-    .landing-hero h1 {
+    .landing-hero h1,
+    .landing-hero h1 *,
+    .landing-hero h1 span {
         font-size: 2.5rem; font-weight: 800; letter-spacing: -0.025em;
         margin: 0 0 0.9rem; position: relative;
         line-height: 1.2;
