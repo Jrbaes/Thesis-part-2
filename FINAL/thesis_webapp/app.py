@@ -202,6 +202,8 @@ def field_display_label(feature_name: str, dictionary_labels: dict[str, str]) ->
 
 def field_label_with_unit(feature_name: str, dictionary_labels: dict[str, str]) -> str:
     label = field_display_label(feature_name, dictionary_labels)
+    if "gram" in label.lower():
+        return label
     unit_text = None
     for candidate in dictionary_name_candidates(feature_name):
         if candidate in FEATURE_UNITS:
@@ -234,25 +236,52 @@ def is_conditionally_allowed_na_value(feature_name: str, value: Any) -> bool:
     return not np.isnan(numeric_value) and numeric_value in allowed_codes
 
 
-def render_top_age_sex_fields(
+def render_quick_identity_fields(
     widget_values: dict[str, float],
     dictionary_labels: dict[str, str],
+    dictionary_value_labels: dict[str, dict[str, str]],
     feature_names: list[str],
     rendered_feature_names: set[str],
 ):
     top_cols = st.columns(3)
     if "age" in feature_names:
         with top_cols[0]:
-            widget_values["age"] = render_number_input("age", dictionary_labels, {})
+            age_text = st.text_input(
+                field_label_with_unit("age", dictionary_labels),
+                value=st.session_state.get("input_age_text", ""),
+                key="input_age_text",
+                placeholder="missing",
+            )
+            if age_text is None or not str(age_text).strip():
+                widget_values["age"] = float("nan")
+            else:
+                try:
+                    age_value = int(round(float(age_text)))
+                except ValueError:
+                    st.warning("Please enter a valid numeric age or leave it blank.")
+                    widget_values["age"] = float("nan")
+                else:
+                    minimum, maximum, _ = feature_range("age")
+                    if age_value < int(round(minimum)) or age_value > int(round(maximum)):
+                        st.warning(f"Age must be between {int(round(minimum))} and {int(round(maximum))}.")
+                        widget_values["age"] = float("nan")
+                    else:
+                        widget_values["age"] = float(age_value)
             rendered_feature_names.add("age")
     else:
         with top_cols[0]:
-            widget_values["age"] = st.number_input("Age", min_value=0, max_value=120, value=40, step=1, help="Age in years.")
+            widget_values["age"] = st.number_input("Age", min_value=0, max_value=120, value=40, step=1)
             rendered_feature_names.add("age")
 
     if "sex" in feature_names:
         with top_cols[1]:
-            widget_values["sex"] = render_number_input("sex", dictionary_labels, VALUE_LABEL_OVERRIDES)
+            sex_choice = st.selectbox(
+                "Sex",
+                options=[None, 1, 2],
+                index=0,
+                format_func=lambda v: "missing" if v is None else ("Male" if v == 1 else "Female"),
+            )
+            widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
             rendered_feature_names.add("sex")
     else:
         with top_cols[1]:
@@ -261,10 +290,14 @@ def render_top_age_sex_fields(
                 options=[None, 1, 2],
                 index=0,
                 format_func=lambda v: "missing" if v is None else ("Male" if v == 1 else "Female"),
-                help="Biological sex.",
             )
             widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
             rendered_feature_names.add("sex")
+
+    if "ethnicity" in feature_names:
+        with top_cols[2]:
+            widget_values["ethnicity"] = render_number_input("ethnicity", dictionary_labels, dictionary_value_labels, show_help=False)
+            rendered_feature_names.add("ethnicity")
 
 
 def _format_numeric_text(value: float, step: float) -> str:
@@ -314,11 +347,16 @@ def render_editable_numeric_input(
     return float(numeric_value)
 
 
-def render_number_input(feature_name: str, dictionary_labels: dict[str, str], dictionary_value_labels: dict[str, dict[str, str]]):
+def render_number_input(
+    feature_name: str,
+    dictionary_labels: dict[str, str],
+    dictionary_value_labels: dict[str, dict[str, str]],
+    show_help: bool = True,
+):
     minimum, maximum, step = feature_range(feature_name)
     default_value = feature_default(feature_name)
     raw_help = field_help_text(feature_name, dictionary_labels)
-    help_text = None if feature_name in NO_HELP_FEATURES else raw_help
+    help_text = None if not show_help or feature_name in NO_HELP_FEATURES else raw_help
     display_label = field_label_with_unit(feature_name, dictionary_labels)
     widget_key = f"input_{feature_name}"
     is_food_group_field = feature_name.startswith("fg") or feature_name.startswith("epwt_fg")
@@ -655,43 +693,43 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
         with cols[index % 3]:
             if feature == "weight":
                 values["weight"] = render_editable_numeric_input(
-                    label="Weight",
+                    label=field_label_with_unit("weight", dictionary_labels),
                     minimum=0.0,
                     maximum=300.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_weight",
-                    help_text=dictionary_labels.get("weight", "Weight in kilograms."),
+                    help_text=None,
                 )
             elif feature == "height":
                 values["height"] = render_editable_numeric_input(
-                    label="Height",
+                    label=field_label_with_unit("height", dictionary_labels),
                     minimum=0.0,
                     maximum=260.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_height",
-                    help_text=(dictionary_labels.get("height", "Height in cm or m.") + " Values >3 are treated as centimeters and converted to meters."),
+                    help_text=None,
                 )
             elif feature == "waist":
                 values["waist"] = render_editable_numeric_input(
-                    label="Waist Circumference",
+                    label=field_label_with_unit("waist", dictionary_labels),
                     minimum=0.0,
                     maximum=200.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_waist",
-                    help_text=dictionary_labels.get("waist", "Waist circumference in cm."),
+                    help_text=None,
                 )
             elif feature == "hip":
                 values["hip"] = render_editable_numeric_input(
-                    label="Hip Circumference",
+                    label=field_label_with_unit("hip", dictionary_labels),
                     minimum=0.0,
                     maximum=200.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_hip",
-                    help_text=dictionary_labels.get("hip", "Hip circumference in cm."),
+                    help_text=None,
                 )
 
     return values
@@ -719,26 +757,71 @@ def make_gauge_chart(score: float):
     return fig
 
 
-def make_cantor_gauge_chart(cantor_score: float, max_score: float):
-    cap = max(float(max_score), 1.0)
-    bounded = min(max(float(cantor_score), 0.0), cap)
+def make_carla_cf_chart(cf_df: pd.DataFrame):
+    """Divergent bar chart in the style of CARLA reference figures.
+
+    Each bar shows the delta (Suggested − Current) for a feature.
+    Blue bars = reduce the value; amber bars = increase the value.
+    Bar labels show the risk reduction percentage.
+    """
+    features = cf_df["Feature"].tolist()
+    currents = cf_df["Current Value"].tolist()
+    suggesteds = cf_df["Suggested Value"].tolist()
+    deltas = [s - c for s, c in zip(suggesteds, currents)]
+    reductions = cf_df["Risk Reduction"].tolist()
+    colors = ["#2563eb" if d < 0 else "#f59e0b" for d in deltas]
+
+    bar_labels = [
+        f"−{r}  ({cur:.1f} → {sug:.1f})"
+        for r, cur, sug in zip(reductions, currents, suggesteds)
+    ]
+
+    # Pad the x-axis so outside labels are never clipped regardless of bar length.
+    # Estimate ~7 px per character at 12 px font; convert to data units using the
+    # axis span so the padding scales with the actual data range.
+    max_abs = max((abs(d) for d in deltas), default=1.0) or 1.0
+    longest_label = max((len(lbl) for lbl in bar_labels), default=10)
+    # Add 55 % of the full span per side for short values; scale by label length.
+    label_pad = max_abs * max(0.55, longest_label * 0.035)
+    x_min = min(min(deltas), 0) - label_pad
+    x_max = max(max(deltas), 0) + label_pad
+
     fig = go.Figure(
-        go.Indicator(
-            mode="gauge+number",
-            value=bounded,
-            number={"font": {"size": 34, "color": "#0f172a"}},
-            gauge={
-                "axis": {"range": [0, cap], "tickwidth": 1, "tickcolor": "#94a3b8"},
-                "bar": {"color": "#2563eb"},
-                "steps": [
-                    {"range": [0, cap * 0.4], "color": "#dbeafe"},
-                    {"range": [cap * 0.4, cap * 0.75], "color": "#bfdbfe"},
-                    {"range": [cap * 0.75, cap], "color": "#93c5fd"},
-                ],
-            },
+        go.Bar(
+            x=deltas,
+            y=features,
+            orientation="h",
+            marker_color=colors,
+            text=bar_labels,
+            textposition="outside",
+            cliponaxis=False,
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Current: %{customdata[0]:.2f}<br>"
+                "Suggested: %{customdata[1]:.2f}<br>"
+                "Change: %{x:+.2f}<br>"
+                "Risk Reduction: %{customdata[2]}"
+                "<extra></extra>"
+            ),
+            customdata=list(zip(currents, suggesteds, reductions)),
         )
     )
-    fig.update_layout(height=260, margin=dict(l=18, r=18, t=8, b=8), paper_bgcolor="rgba(0,0,0,0)")
+    fig.add_vline(x=0, line_width=1, line_color="#64748b")
+    fig.update_layout(
+        height=max(220, 36 * len(features)),
+        margin=dict(l=10, r=20, t=30, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            title="Suggested − Current Value",
+            range=[x_min, x_max],
+            zeroline=False,
+            showgrid=True,
+            gridcolor="#e2e8f0",
+        ),
+        yaxis=dict(autorange="reversed", tickfont=dict(size=12)),
+        showlegend=False,
+    )
     return fig
 
 
@@ -874,6 +957,15 @@ def _model_column_source_input_feature(model_column: str, input_features: list[s
         if token_lc.startswith(f"{feature_name}_"):
             return feature_name
 
+    # Alias lookup: model may use short names (Total_Ribo) while the input
+    # form uses the full survey name (Total_Riboflavin).  Check both directions.
+    for key, aliases in FEATURE_DICTIONARY_ALIASES.items():
+        group = {key.lower()} | {a.lower() for a in aliases}
+        if token_lc in group:
+            for member_lc in group:
+                if member_lc in lowered_features:
+                    return member_lc
+
     return None
 
 
@@ -891,11 +983,14 @@ def _raw_value_for_feature(model_col: str, input_features: list[str], widget_val
     source = _model_column_source_input_feature(model_col, input_features)
     if source is None:
         return None
-    # widget_values keys may be prefixed with "input_"
+    # widget_values keys may be mixed-case or prefixed with "input_".
+    # Use a case-insensitive lookup so "total_riboflavin" matches "Total_Riboflavin".
+    wv_lower = {k.lower(): v for k, v in widget_values.items()}
     for key in (source, f"input_{source}"):
-        if key in widget_values:
+        val = wv_lower.get(key.lower())
+        if val is not None:
             try:
-                return float(widget_values[key])
+                return float(val)
             except (TypeError, ValueError):
                 return None
     return None
@@ -916,6 +1011,23 @@ def _parse_lime_feature(rule: str, input_features: list[str]) -> str | None:
     for name in sorted(input_features, key=len, reverse=True):
         if name.lower() in rule_lc:
             return name
+    return None
+
+
+def _resolve_lime_source_feature(
+    model_like_name: str,
+    rule_text: str,
+    input_features: list[str],
+) -> str | None:
+    """Map LIME feature text back to a raw user-input feature when possible."""
+    if model_like_name in input_features:
+        return model_like_name
+    mapped = _model_column_source_input_feature(model_like_name, input_features)
+    if mapped is not None:
+        return mapped
+    parsed = _parse_lime_feature(rule_text, input_features)
+    if parsed is not None:
+        return parsed
     return None
 
 
@@ -975,22 +1087,22 @@ if not st.session_state.show_form:
                                                 border:1px solid rgba(24,33,47,0.09);border-radius:22px;
                                                 padding:1.6rem 2rem;box-shadow:0 8px 30px rgba(15,23,42,0.07);">
                             <div style="text-align:center;font-size:0.74rem;text-transform:uppercase;
-                                                    letter-spacing:0.15em;color:#64748b;margin-bottom:1rem;">Model Performance</div>
+                                                    letter-spacing:0.15em;color:#1e293b;margin-bottom:1rem;">Model Performance</div>
                             <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.2rem;">
                                 <div style="text-align:center;">
                                     <div style="font-size:2rem;font-weight:800;color:#0f172a;">76.9%</div>
-                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Accuracy</div>
+                                    <div style="font-size:0.82rem;color:#1e293b;margin-top:0.2rem;">Accuracy</div>
                                 </div>
                                 <div style="text-align:center;">
                                     <div style="font-size:2rem;font-weight:800;color:#dc2626;">76.5%</div>
-                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">Recall</div>
+                                    <div style="font-size:0.82rem;color:#1e293b;margin-top:0.2rem;">Recall</div>
                                 </div>
                                 <div style="text-align:center;">
                                     <div style="font-size:2rem;font-weight:800;color:#0f172a;">84.7%</div>
-                                    <div style="font-size:0.82rem;color:#64748b;margin-top:0.2rem;">AUC</div>
+                                    <div style="font-size:0.82rem;color:#1e293b;margin-top:0.2rem;">AUC</div>
                                 </div>
                             </div>
-                            <div style="font-size:0.83rem;color:#475569;line-height:1.65;text-align:justify;text-justify:inter-word;">
+                            <div style="font-size:0.83rem;color:#1f2937;line-height:1.65;text-align:justify;text-justify:inter-word;">
                                 <strong>Accuracy</strong> is the share of all individuals the model classifies correctly.
                                 <strong>Recall</strong> (sensitivity) is the share of true hypertensive cases the model catches —
                                 prioritised here because missing a true positive in health screening carries greater risk than a false alarm.
@@ -1035,12 +1147,12 @@ else:
     st.markdown(
         "<div id='input-section' class='section-header'>"
         "<h2>Patient Details</h2>"
-        "<p>Complete all sections below. Use the question-mark hover next to each field for clearer definitions, units, and input hints."
+        "<p>Complete all sections below."
         " Click Predict My Risk to see the output below this form on the same page.</p>"
         "</div>",
         unsafe_allow_html=True,
     )
-    st.caption("Tip: hover over the ? icon beside any input to view definition, units, and expected value range.")
+    st.caption("Enter the requested values below. Hover the ? icon beside each field to view hints and definitions.")
 
     # No st.form wrapper – inputs update live so dietary totals auto-compute on every re-render.
     submitted = False
@@ -1056,30 +1168,11 @@ else:
     )
 
     st.markdown("#### Quick Identity and Key Inputs")
-    render_top_age_sex_fields(widget_values, dictionary_labels, feature_names, rendered_feature_names)
+    render_quick_identity_fields(widget_values, dictionary_labels, dictionary_value_labels, feature_names, rendered_feature_names)
     required_field_labels["age"] = field_display_label("age", dictionary_labels)
     required_field_labels["sex"] = field_display_label("sex", dictionary_labels)
-
-    if "Core clinical" in grouped_features:
-        st.markdown("#### Clinical")
-        core_cols = st.columns(3)
-
-        priority = ["hemoglobin"]
-        clinical_features = [f for f in grouped_features["Core clinical"] if f not in engineered_names and f not in {"age", "sex"}]
-        if "hemoglobin" in feature_names and "hemoglobin" not in clinical_features:
-            clinical_features.append("hemoglobin")
-        ordered_features: list[str] = [f for f in priority if f in clinical_features]
-        ordered_features.extend([f for f in clinical_features if f not in ordered_features])
-
-        for index, feature_name in enumerate(ordered_features):
-            if feature_name in engineered_names:
-                continue
-            if feature_name in rendered_feature_names:
-                continue
-            with core_cols[index % 3]:
-                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
-                rendered_feature_names.add(feature_name)
-                required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
+    if "ethnicity" in feature_names:
+        required_field_labels["ethnicity"] = field_display_label("ethnicity", dictionary_labels)
 
     if has_engineered_features:
         st.markdown("#### Behavioral (Smoking and Alcohol)")
@@ -1097,7 +1190,7 @@ else:
             if feature_name in rendered_feature_names:
                 continue
             with anthro_cols[index % 3]:
-                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
+                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels, show_help=False)
                 rendered_feature_names.add(feature_name)
                 required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
 
@@ -1107,7 +1200,7 @@ else:
 
     if "Dietary pattern" in grouped_features:
         st.markdown("#### Dietary")
-        st.caption("Enter each dietary value as your daily intake. Definitions for each dietary component are available in the field hover tooltips (?).")
+        st.caption("Enter each dietary value as your daily intake. Hover the ? icon on each field for definitions and examples.")
         dietary_features = list(grouped_features["Dietary pattern"])
         if "vita" in feature_names and "vita" not in dietary_features:
             dietary_features.append("vita")
@@ -1162,7 +1255,7 @@ else:
                             subtotal_value += float(raw)
 
                         minimum, maximum, step = feature_range(feature_name)
-                        display_label = field_display_label(feature_name, dictionary_labels)
+                        display_label = field_label_with_unit(feature_name, dictionary_labels)
                         help_text = field_help_text(feature_name, dictionary_labels)
                         st.number_input(
                             display_label,
@@ -1417,7 +1510,7 @@ else:
                         box-shadow:0 4px 18px rgba(15,23,42,0.06);">
 
               <h4 style="margin-top:0;color:#0f172a;">1 &nbsp; What does your percentage score actually mean?</h4>
-              <p style="color:#334155;line-height:1.7;">
+                            <p style="color:#1f2937;line-height:1.7;">
                 The percentage you see is a <strong>Mathematically Honest Risk Score</strong>. Our system processes
                 your data through a statistical safety filter called a <strong>Venn-Abers Predictor</strong> to ensure
                 your score matches real-world reality. If the app gives you a <strong>35% risk score</strong>, it is a
@@ -1426,11 +1519,11 @@ else:
               </p>
 
               <h4 style="color:#0f172a;">2 &nbsp; Why does the app flag me as &ldquo;High Risk&rdquo; at 35% instead of 50%?</h4>
-              <p style="color:#334155;line-height:1.7;">
+                            <p style="color:#1f2937;line-height:1.7;">
                 It is a common misconception that 50% is the standard tipping point. In reality, the baseline average
                 for clinical hypertension in the Philippines is only <strong>15.20%</strong>.
               </p>
-              <p style="color:#334155;line-height:1.7;">
+                            <p style="color:#1f2937;line-height:1.7;">
                 Because our model provides perfectly calibrated, real-world numbers, waiting until your score reaches
                 50% means your risk is <strong>more than triple the national average</strong>. By that point, severe
                 cardiovascular damage may already be occurring. We set our &ldquo;High Risk&rdquo; alert at
@@ -1486,29 +1579,25 @@ else:
                 )
                 st.dataframe(cf_df, width='stretch', hide_index=True)
 
-                if "Cantor Score" in cf_df.columns and not cf_df.empty:
-                    best_idx = int(cf_df["Cantor Score"].astype(float).idxmax())
-                    best_row = cf_df.loc[best_idx]
-                    max_cantor = float(cf_df["Cantor Score"].astype(float).max())
-                    st.markdown("##### Counterfactual Priority Gauge (Cantor)")
+                if "CARLA Score" in cf_df.columns and not cf_df.empty:
+                    best_row = cf_df.loc[cf_df["CARLA Score"].astype(float).idxmax()]
+                    st.markdown("##### CARLA Counterfactual — Feature Change Chart")
                     st.caption(
-                        "Cantor score combines change size and risk reduction to prioritise practical high-impact recommendations. "
-                        "Higher is better."
+                        "Each bar shows how much a feature must change (Suggested − Current) to reduce hypertension risk. "
+                        "Blue bars = lower the value; amber bars = raise the value. "
+                        "Labels show the projected risk reduction. "
+                        "Rows are ranked by CARLA score (high reduction with minimal change scores highest)."
                     )
-                    g_left, g_right = st.columns([1, 1.4])
-                    with g_left:
-                        st.plotly_chart(
-                            make_cantor_gauge_chart(float(best_row["Cantor Score"]), max_cantor),
-                            width='stretch',
-                            config=PLOTLY_STATIC_CONFIG,
-                        )
-                    with g_right:
-                        st.markdown(
-                            f"**Top suggestion:** {best_row['Feature']}  \n"
-                            f"Current value: {best_row['Current Value']}  \n"
-                            f"Suggested value: {best_row['Suggested Value']}  \n"
-                            f"Projected reduction: {best_row['Risk Reduction']}"
-                        )
+                    st.plotly_chart(
+                        make_carla_cf_chart(cf_df),
+                        width='stretch',
+                        config=PLOTLY_STATIC_CONFIG,
+                    )
+                    st.markdown(
+                        f"**Top recommendation:** {best_row['Feature']}  \n"
+                        f"Change from **{best_row['Current Value']}** → **{best_row['Suggested Value']}** "
+                        f"to reduce predicted risk by **{best_row['Risk Reduction']}**."
+                    )
 
         print("[DEBUG] >>> starting explainability section", flush=True)
         st.markdown(
@@ -1612,19 +1701,26 @@ else:
                         _fmt_raw(_raw_value_for_feature(f, _ifnames_exp, _wvals_exp))
                         for f in local_top["feature"]
                     ]
-                    st.table(local_top[["feature", "your_input", "shap_value"]])
+                    local_top["Feature"] = [
+                        field_display_label(f, dictionary_labels)
+                        for f in local_top["feature"]
+                    ]
+                    st.table(
+                        local_top[["Feature", "your_input", "shap_value"]]
+                        .rename(columns={"your_input": "Your Input", "shap_value": "SHAP Value"})
+                    )
                     chart_df = local_top.head(10).iloc[::-1]
                     st.plotly_chart(
                         go.Figure(
                             go.Bar(
                                 x=chart_df["shap_value"],
-                                y=chart_df["feature"],
+                                y=chart_df["Feature"],
                                 orientation="h",
                                 marker_color=["#dc2626" if value >= 0 else "#2563eb" for value in chart_df["shap_value"]],
                                 customdata=chart_df["your_input"],
                                 hovertemplate="<b>%{y}</b><br>SHAP value: %{x:.4f}<br>Your input: %{customdata}<extra></extra>",
                             )
-                        ).update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10)),
+                        ).update_layout(height=max(320, 28 * len(chart_df)), margin=dict(l=10, r=10, t=10, b=10)),
                         width='stretch',
                         config=PLOTLY_STATIC_CONFIG,
                     )
@@ -1646,11 +1742,27 @@ else:
                     lime_rows = []
                     for _, row in lime_df.head(12).iterrows():
                         weight = float(row["weight"])
-                        raw_fname = str(row.get("feature", "")).strip()
-                        if not raw_fname:
-                            raw_fname = _parse_lime_feature(str(row.get("rule", "")), _ifnames_exp) or str(row.get("rule", ""))
-                        raw_val = _raw_value_for_feature(raw_fname, _ifnames_exp, _wvals_exp)
-                        display_name = field_display_label(raw_fname, dictionary_labels) if raw_fname in _ifnames_exp else raw_fname
+                        raw_or_model_name = str(row.get("feature", "")).strip()
+                        rule_text = str(row.get("rule", ""))
+                        if not raw_or_model_name:
+                            raw_or_model_name = rule_text
+
+                        resolved_input_feature = _resolve_lime_source_feature(
+                            model_like_name=raw_or_model_name,
+                            rule_text=rule_text,
+                            input_features=_ifnames_exp,
+                        )
+
+                        raw_val = _raw_value_for_feature(
+                            resolved_input_feature if resolved_input_feature else raw_or_model_name,
+                            _ifnames_exp,
+                            _wvals_exp,
+                        )
+                        display_name = (
+                            field_display_label(resolved_input_feature, dictionary_labels)
+                            if resolved_input_feature and resolved_input_feature in _ifnames_exp
+                            else raw_or_model_name
+                        )
                         lime_rows.append({"feature": display_name, "your_input": _fmt_raw(raw_val), "lime_weight": weight})
 
                     lime_display_df = pd.DataFrame(lime_rows)

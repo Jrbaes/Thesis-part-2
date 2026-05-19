@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app_constants import DISPLAY_LABEL_OVERRIDES
+from app_constants import DISPLAY_LABEL_OVERRIDES, FOOD_GROUP_COMPONENT_TOTALS
 from backend import (
     RANGE_HINTS,
     build_input_values_from_widgets,
@@ -20,10 +20,13 @@ NON_ACTIONABLE_FEATURES = {"age", "sex", "ethnicity", "ethnicity_group"}
 REDUCE_ONLY_FEATURES = {"BMI", "bmi", "waist", "hip"}
 
 
-def _cantor_pair(k1: int, k2: int) -> int:
-    # Cantor pairing over non-negative integers.
-    s = k1 + k2
-    return int((s * (s + 1)) // 2 + k2)
+def _carla_score(reduction_pct: float, relative_change_pct: float) -> float:
+    """CARLA-style proximity-adjusted utility.
+
+    Higher reduction with smaller relative change scores highest.
+    Equivalent to CARLA's Wachter objective: maximise gain, minimise cost.
+    """
+    return reduction_pct / (1.0 + relative_change_pct / 100.0)
 
 
 def _display_label(fname: str, dictionary_labels: dict[str, str]) -> str:
@@ -53,7 +56,24 @@ def compute_counterfactuals(
     DECISION_BOUNDARY = 0.35
     GRID_STEPS = 60  # fallback grid resolution when Wachter can't cross 0.35
 
-    scan_features = [fname for fname in all_widget_values if fname in RANGE_HINTS and fname not in NON_ACTIONABLE_FEATURES and not fname.startswith("epwt_fg") and not fname.startswith("fg")]
+    # Auto-sum parent food groups (e.g. fg14 = fg15+fg16+fg17+fg18) are not
+    # directly actionable — skip them. Leaf food groups (fg15, fg16, …) are
+    # directly user-entered and should be scanned.
+    _parent_fg_indices = frozenset(FOOD_GROUP_COMPONENT_TOTALS.keys())
+
+    def _is_parent_food_group(name: str) -> bool:
+        for prefix in ("epwt_fg", "fg"):
+            if name.startswith(prefix):
+                suffix = name[len(prefix):]
+                return suffix.isdigit() and int(suffix) in _parent_fg_indices
+        return False
+
+    scan_features = [
+        fname for fname in all_widget_values
+        if fname in RANGE_HINTS
+        and fname not in NON_ACTIONABLE_FEATURES
+        and not _is_parent_food_group(fname)
+    ]
 
     def _predict_for_value(fname: str, val: float) -> float:
         test_widget = dict(all_widget_values)
@@ -119,10 +139,7 @@ def compute_counterfactuals(
         abs_delta = abs(cf_val - current_val)
         relative_delta_pct = 0.0 if abs(current_val) < 1e-6 else (abs_delta / max(abs(current_val), 1e-6)) * 100.0
 
-        # Quantise terms for a stable Cantor score: smaller change + larger reduction is better.
-        q_reduction = max(0, int(round(reduction * 10.0)))
-        q_delta = max(0, int(round(relative_delta_pct * 10.0)))
-        cantor_score = _cantor_pair(q_delta, q_reduction)
+        score = _carla_score(reduction, relative_delta_pct)
 
         if reduction <= 0.05 or np.isclose(cf_val, current_val, atol=1e-3):
             continue
@@ -134,7 +151,7 @@ def compute_counterfactuals(
             "Current Risk": f"{current_probability * 100:.1f}%",
             "Projected Risk": f"{cf_prob * 100:.1f}%",
             "Risk Reduction": f"{reduction:.1f}%",
-            "Cantor Score": cantor_score,
+            "CARLA Score": round(score, 3),
             "_delta": reduction,
         })
 
@@ -142,7 +159,13 @@ def compute_counterfactuals(
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df = df.sort_values("_delta", ascending=False).drop(columns=["_delta"]).head(top_n).reset_index(drop=True)
+    # Primary ranking: CARLA-style proximity-adjusted utility (higher = better tradeoff).
+    df = (
+        df.sort_values(["CARLA Score", "_delta"], ascending=[False, False])
+        .drop(columns=["_delta"])
+        .head(top_n)
+        .reset_index(drop=True)
+    )
     return df
 
 
@@ -163,7 +186,8 @@ def compute_counterfactuals_safe(
     Streamlit main process, which would cause os._exit() on Windows when
     Streamlit's own threads try to run concurrently.
 
-    Falls back to in-process computation if the model cannot be pickled.
+    If subprocess transport cannot be prepared, return an empty result instead
+    of falling back to in-process computation.
     """
     import pathlib
     import pickle
@@ -190,17 +214,8 @@ def compute_counterfactuals_safe(
         _bytes = pickle.dumps(payload)
         del _bytes
     except Exception:
-        # Not picklable — run in-process as fallback
-        return compute_counterfactuals(
-            model=model,
-            preprocessor=preprocessor,
-            calibrator=calibrator,
-            all_widget_values=all_widget_values,
-            input_feature_names=input_feature_names,
-            dictionary_labels=dictionary_labels,
-            current_probability=current_probability,
-            top_n=top_n,
-        )
+        # Not picklable — keep the app alive and degrade gracefully.
+        return pd.DataFrame()
 
     uid = uuid.uuid4().hex
     tmp_dir = pathlib.Path(tempfile.gettempdir())
@@ -211,12 +226,15 @@ def compute_counterfactuals_safe(
         with open(tmp_in, "wb") as fh:
             pickle.dump(payload, fh)
 
-        proc = subprocess.Popen(
-            [sys.executable, str(worker), str(tmp_in), str(tmp_out)],
-            cwd=str(_dir),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, str(worker), str(tmp_in), str(tmp_out)],
+                cwd=str(_dir),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+        except Exception:
+            return pd.DataFrame()
 
         try:
             returncode = proc.wait(timeout=timeout)
@@ -228,11 +246,16 @@ def compute_counterfactuals_safe(
         if not tmp_out.exists():
             return pd.DataFrame()
 
-        with open(tmp_out, "rb") as fh:
-            result = pickle.load(fh)
+        try:
+            with open(tmp_out, "rb") as fh:
+                result = pickle.load(fh)
+        except Exception:
+            return pd.DataFrame()
 
         return result if isinstance(result, pd.DataFrame) else pd.DataFrame()
 
+    except Exception:
+        return pd.DataFrame()
     finally:
         for f in (tmp_in, tmp_out):
             try:
