@@ -234,25 +234,52 @@ def is_conditionally_allowed_na_value(feature_name: str, value: Any) -> bool:
     return not np.isnan(numeric_value) and numeric_value in allowed_codes
 
 
-def render_top_age_sex_fields(
+def render_quick_identity_fields(
     widget_values: dict[str, float],
     dictionary_labels: dict[str, str],
+    dictionary_value_labels: dict[str, dict[str, str]],
     feature_names: list[str],
     rendered_feature_names: set[str],
 ):
     top_cols = st.columns(3)
     if "age" in feature_names:
         with top_cols[0]:
-            widget_values["age"] = render_number_input("age", dictionary_labels, {})
+            age_text = st.text_input(
+                field_label_with_unit("age", dictionary_labels),
+                value=st.session_state.get("input_age_text", ""),
+                key="input_age_text",
+                placeholder="missing",
+            )
+            if age_text is None or not str(age_text).strip():
+                widget_values["age"] = float("nan")
+            else:
+                try:
+                    age_value = int(round(float(age_text)))
+                except ValueError:
+                    st.warning("Please enter a valid numeric age or leave it blank.")
+                    widget_values["age"] = float("nan")
+                else:
+                    minimum, maximum, _ = feature_range("age")
+                    if age_value < int(round(minimum)) or age_value > int(round(maximum)):
+                        st.warning(f"Age must be between {int(round(minimum))} and {int(round(maximum))}.")
+                        widget_values["age"] = float("nan")
+                    else:
+                        widget_values["age"] = float(age_value)
             rendered_feature_names.add("age")
     else:
         with top_cols[0]:
-            widget_values["age"] = st.number_input("Age", min_value=0, max_value=120, value=40, step=1, help="Age in years.")
+            widget_values["age"] = st.number_input("Age", min_value=0, max_value=120, value=40, step=1)
             rendered_feature_names.add("age")
 
     if "sex" in feature_names:
         with top_cols[1]:
-            widget_values["sex"] = render_number_input("sex", dictionary_labels, VALUE_LABEL_OVERRIDES)
+            sex_choice = st.selectbox(
+                "Sex",
+                options=[None, 1, 2],
+                index=0,
+                format_func=lambda v: "missing" if v is None else ("Male" if v == 1 else "Female"),
+            )
+            widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
             rendered_feature_names.add("sex")
     else:
         with top_cols[1]:
@@ -261,10 +288,14 @@ def render_top_age_sex_fields(
                 options=[None, 1, 2],
                 index=0,
                 format_func=lambda v: "missing" if v is None else ("Male" if v == 1 else "Female"),
-                help="Biological sex.",
             )
             widget_values["sex"] = float("nan") if sex_choice is None else float(sex_choice)
             rendered_feature_names.add("sex")
+
+    if "ethnicity" in feature_names:
+        with top_cols[2]:
+            widget_values["ethnicity"] = render_number_input("ethnicity", dictionary_labels, dictionary_value_labels, show_help=False)
+            rendered_feature_names.add("ethnicity")
 
 
 def _format_numeric_text(value: float, step: float) -> str:
@@ -314,11 +345,16 @@ def render_editable_numeric_input(
     return float(numeric_value)
 
 
-def render_number_input(feature_name: str, dictionary_labels: dict[str, str], dictionary_value_labels: dict[str, dict[str, str]]):
+def render_number_input(
+    feature_name: str,
+    dictionary_labels: dict[str, str],
+    dictionary_value_labels: dict[str, dict[str, str]],
+    show_help: bool = True,
+):
     minimum, maximum, step = feature_range(feature_name)
     default_value = feature_default(feature_name)
     raw_help = field_help_text(feature_name, dictionary_labels)
-    help_text = None if feature_name in NO_HELP_FEATURES else raw_help
+    help_text = None if not show_help or feature_name in NO_HELP_FEATURES else raw_help
     display_label = field_label_with_unit(feature_name, dictionary_labels)
     widget_key = f"input_{feature_name}"
     is_food_group_field = feature_name.startswith("fg") or feature_name.startswith("epwt_fg")
@@ -655,43 +691,43 @@ def render_anthro_origin_inputs(dictionary_labels: dict[str, str], rendered_feat
         with cols[index % 3]:
             if feature == "weight":
                 values["weight"] = render_editable_numeric_input(
-                    label="Weight",
+                    label=field_label_with_unit("weight", dictionary_labels),
                     minimum=0.0,
                     maximum=300.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_weight",
-                    help_text=dictionary_labels.get("weight", "Weight in kilograms."),
+                    help_text=None,
                 )
             elif feature == "height":
                 values["height"] = render_editable_numeric_input(
-                    label="Height",
+                    label=field_label_with_unit("height", dictionary_labels),
                     minimum=0.0,
                     maximum=260.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_height",
-                    help_text=(dictionary_labels.get("height", "Height in cm or m.") + " Values >3 are treated as centimeters and converted to meters."),
+                    help_text=None,
                 )
             elif feature == "waist":
                 values["waist"] = render_editable_numeric_input(
-                    label="Waist Circumference",
+                    label=field_label_with_unit("waist", dictionary_labels),
                     minimum=0.0,
                     maximum=200.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_waist",
-                    help_text=dictionary_labels.get("waist", "Waist circumference in cm."),
+                    help_text=None,
                 )
             elif feature == "hip":
                 values["hip"] = render_editable_numeric_input(
-                    label="Hip Circumference",
+                    label=field_label_with_unit("hip", dictionary_labels),
                     minimum=0.0,
                     maximum=200.0,
                     default_value=0.0,
                     step=0.1,
                     widget_key="raw_hip",
-                    help_text=dictionary_labels.get("hip", "Hip circumference in cm."),
+                    help_text=None,
                 )
 
     return values
@@ -1035,12 +1071,12 @@ else:
     st.markdown(
         "<div id='input-section' class='section-header'>"
         "<h2>Patient Details</h2>"
-        "<p>Complete all sections below. Use the question-mark hover next to each field for clearer definitions, units, and input hints."
+        "<p>Complete all sections below."
         " Click Predict My Risk to see the output below this form on the same page.</p>"
         "</div>",
         unsafe_allow_html=True,
     )
-    st.caption("Tip: hover over the ? icon beside any input to view definition, units, and expected value range.")
+    st.caption("Enter the requested values below. Dietary inputs still include field hints where needed.")
 
     # No st.form wrapper – inputs update live so dietary totals auto-compute on every re-render.
     submitted = False
@@ -1056,30 +1092,11 @@ else:
     )
 
     st.markdown("#### Quick Identity and Key Inputs")
-    render_top_age_sex_fields(widget_values, dictionary_labels, feature_names, rendered_feature_names)
+    render_quick_identity_fields(widget_values, dictionary_labels, dictionary_value_labels, feature_names, rendered_feature_names)
     required_field_labels["age"] = field_display_label("age", dictionary_labels)
     required_field_labels["sex"] = field_display_label("sex", dictionary_labels)
-
-    if "Core clinical" in grouped_features:
-        st.markdown("#### Clinical")
-        core_cols = st.columns(3)
-
-        priority = ["hemoglobin"]
-        clinical_features = [f for f in grouped_features["Core clinical"] if f not in engineered_names and f not in {"age", "sex"}]
-        if "hemoglobin" in feature_names and "hemoglobin" not in clinical_features:
-            clinical_features.append("hemoglobin")
-        ordered_features: list[str] = [f for f in priority if f in clinical_features]
-        ordered_features.extend([f for f in clinical_features if f not in ordered_features])
-
-        for index, feature_name in enumerate(ordered_features):
-            if feature_name in engineered_names:
-                continue
-            if feature_name in rendered_feature_names:
-                continue
-            with core_cols[index % 3]:
-                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
-                rendered_feature_names.add(feature_name)
-                required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
+    if "ethnicity" in feature_names:
+        required_field_labels["ethnicity"] = field_display_label("ethnicity", dictionary_labels)
 
     if has_engineered_features:
         st.markdown("#### Behavioral (Smoking and Alcohol)")
@@ -1097,7 +1114,7 @@ else:
             if feature_name in rendered_feature_names:
                 continue
             with anthro_cols[index % 3]:
-                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels)
+                widget_values[feature_name] = render_number_input(feature_name, dictionary_labels, dictionary_value_labels, show_help=False)
                 rendered_feature_names.add(feature_name)
                 required_field_labels[feature_name] = field_display_label(feature_name, dictionary_labels)
 
