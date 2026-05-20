@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+.git
+.gitignore
+.vscode
+thesis_env
+thesis_env_py312

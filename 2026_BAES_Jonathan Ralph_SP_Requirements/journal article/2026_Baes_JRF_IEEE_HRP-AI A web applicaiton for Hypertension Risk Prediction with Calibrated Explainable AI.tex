@@ -1,0 +1,369 @@
+%% IEEE Journal Manuscript - HRP-AI
+%% Generated from the final SP manuscript; biography intentionally omitted.
+
+\documentclass[journal]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{balance}
+
+\hyphenation{hy-per-ten-sion Ven-n-Abers coun-ter-fac-tu-al}
+
+\begin{document}
+
+\title{HRP-AI: A Web Application for Hypertension Risk Prediction with Calibrated Explainable AI}
+
+\author{Jonathan~Ralph~F.~Baes%
+\thanks{J. R. F. Baes is with the Department of Physical Sciences and Mathematics, College of Arts and Sciences, University of the Philippines Manila, Manila, Philippines. E-mail: baesjonathanralph@gmail.com.}%
+}
+
+\markboth{IEEE Journal Manuscript Draft, 2026}%
+{Baes: HRP-AI: Hypertension Risk Prediction with Calibrated Explainable AI}
+
+\maketitle
+
+\begin{abstract}
+Hypertension remains a major public health concern in the Philippines and requires scalable screening tools that are both interpretable and probability-aware. This paper presents HRP-AI, a web-based decision-support application for predicting clinical hypertension risk among Filipino adults using calibrated explainable machine learning. Using the 2015 DOST-FNRI National Nutrition Survey, a dataset of 151,189 adults was constructed, including 22,988 hypertension-positive cases based on the $\geq 140/90$ mmHg clinical threshold. Eight machine learning algorithms were evaluated under multiple imbalance-handling configurations using a two-stage randomized optimization strategy. XGBoost with class weights was selected as the final predictive engine because it provided the strongest clinical compromise between sensitivity, discrimination, and calibration compatibility. At the standard 0.50 decision threshold, the model achieved 76.87\% accuracy, 76.51\% recall, an F1-score of 0.5014, and an AUC of 0.8469. Under the selected 0.35 screening threshold, recall increased to 87.88\%. Venn-Abers calibration reduced the Expected Calibration Error to 0.0035. The final prototype integrates calibrated risk estimates, uncertainty bounds, SHAP and LIME explanations, and Wachter-style counterfactual suggestions. The results show that non-linear machine learning models can be adapted into transparent, probability-aware, and exploratory hypertension screening tools when discrimination, calibration, explainability, and clinical threshold behavior are jointly considered.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Hypertension, machine learning, XGBoost, probability calibration, Venn-Abers, explainable artificial intelligence, SHAP, LIME, counterfactual explanations.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{H}{ypertension} is a leading non-communicable disease and a major contributor to cardiovascular morbidity and premature mortality. It is frequently described as a silent condition because many affected individuals remain asymptomatic until complications occur. In the Philippine setting, national survey reports indicate that hypertension remains a persistent public health burden, with substantial gaps in awareness, treatment, and blood pressure control \cite{ona2021executive}. These conditions motivate the development of scalable tools that can support early risk identification and preventive counseling.
+
+Machine learning has become increasingly relevant for cardiovascular risk prediction because it can model complex and non-linear relationships in clinical, anthropometric, lifestyle, and dietary data. However, two practical issues limit the adoption of machine learning systems in clinical decision support. First, high-performing models such as gradient boosting ensembles are often considered black boxes, making their predictions difficult to interpret. Second, discriminative performance does not guarantee probability reliability; a model can rank patients well while producing poorly calibrated risk estimates. This is problematic in healthcare because risk scores are often interpreted as probabilities.
+
+Explainable artificial intelligence (XAI) methods such as SHAP and LIME improve transparency by identifying the features that influence a prediction. Probability calibration methods such as Platt scaling, isotonic regression, and Venn-Abers predictors improve the reliability of predicted probabilities. This study integrates these ideas into HRP-AI, a web application for hypertension risk prediction with calibrated explainable AI. The system is designed not as a replacement for clinical diagnosis but as an exploratory decision-support prototype for risk screening.
+
+The main contributions of this work are as follows:
+\begin{itemize}
+    \item a calibrated machine learning pipeline for hypertension risk prediction using the 2015 DOST-FNRI National Nutrition Survey;
+    \item a comparative evaluation of eight supervised learning algorithms under multiple imbalance-handling configurations;
+    \item integration of Venn-Abers calibration to improve probability reliability and provide uncertainty bounds;
+    \item incorporation of SHAP, LIME, and bounded counterfactual optimization into a web-based decision-support interface.
+\end{itemize}
+
+\section{Related Work}
+Machine learning has been widely explored for cardiovascular and hypertension risk prediction. Earlier systems often relied on logistic regression or conventional risk scores, while recent studies increasingly use ensemble models such as random forests, XGBoost, LightGBM, and CatBoost because of their ability to capture non-linear interactions in structured tabular data. Studies on hypertension prediction and digital health tools have demonstrated the feasibility of deploying machine learning models in web-based or decision-support environments \cite{naik2025artificial,pandey2025development}.
+
+National health surveys are attractive for population-level screening research because they contain large samples and diverse respondent profiles. However, they also introduce modeling challenges that are less prominent in small curated clinical datasets. These include missingness from non-response, heterogeneous variable types, self-reported dietary variables, and natural class imbalance. In hypertension prediction, this imbalance is especially important because a model can obtain high apparent accuracy by favoring the non-hypertensive majority while failing to identify many true positive cases. This motivates the use of cost-sensitive learning, resampling, and threshold analysis rather than relying on accuracy alone.
+
+Despite advances in machine learning, many predictive systems prioritize discrimination metrics such as accuracy and AUC while giving less attention to calibration. In medical contexts, calibration is critical because a predicted risk score is frequently interpreted as a probability. Poor calibration may lead to overconfident or underconfident decisions. Prior work has emphasized that post-hoc calibration and uncertainty-aware explanations are necessary to improve the trustworthiness of machine learning outputs \cite{lofstrom2023primer,lofstrom2024calibrated_uncertainty}.
+
+Explainability is another central concern in medical AI. SHAP provides feature attributions grounded in cooperative game theory, while LIME approximates the local behavior of complex models using simpler interpretable models \cite{shap,ribeiro2016lime}. Counterfactual explanations further extend interpretability by identifying what minimal changes would alter a model's decision \cite{wachter2017counterfactual}. However, few systems combine calibrated probabilities, uncertainty intervals, local and global explanation methods, and actionable counterfactuals in a single hypertension screening application using Philippine national survey data.
+
+This gap is especially important for public-health screening tools because the end user is often not interested only in a binary label. A usable risk system must answer several linked questions: whether the respondent is likely to be at elevated risk, how reliable that probability is, which factors are contributing to the prediction, and what realistic changes may move the respondent below the operating threshold. Existing systems frequently address only one or two of these requirements. HRP-AI was designed to combine them in a single pipeline so that prediction, reliability, explanation, and actionability are treated as connected components rather than separate afterthoughts.
+
+\section{Materials and Methods}
+
+\subsection{Dataset and Target Definition}
+This study used the 2015 DOST-FNRI National Nutrition Survey (NNS), specifically the Clinical and Health, Anthropometry, and Individual Dietary components \cite{nnsClinical2015}. The datasets were merged using respondent-level identifiers to construct a multimodal feature set containing clinical, anthropometric, lifestyle, and dietary variables. After filtering according to the adult modeling scope and removing records unsuitable for target construction, the final analytical dataset contained 151,189 adult respondents.
+
+The binary target variable, \emph{Hypertension}, was constructed using the clinical threshold of systolic blood pressure $\geq 140$ mmHg or diastolic blood pressure $\geq 90$ mmHg. Respondents satisfying either condition were labeled as hypertension-positive. The final dataset contained 22,988 hypertension-positive cases, corresponding to a prevalence of 15.20\%.
+
+\subsection{Preprocessing and Feature Engineering}
+The preprocessing pipeline included target construction, leakage prevention, missing-value handling, outlier treatment, feature engineering, scaling, and feature selection. Since the target was directly derived from blood pressure measurements, direct and indirect blood-pressure-related variables were removed after target construction to prevent leakage. Body Mass Index (BMI), waist-to-hip-related anthropometric features, and lifestyle-level variables were engineered from anthropometric and questionnaire responses.
+
+Missing values were handled using K-nearest neighbors imputation for numerical variables and mode-based imputation for categorical variables. Numerical variables were standardized before imputation to preserve distance validity. Feature selection included the removal of administrative identifiers, redundant dietary weight variables, intermediate engineering variables, and highly collinear features.
+
+The preprocessing design was intended to preserve clinically meaningful signals while avoiding artificial performance inflation. Blood pressure variables were used only to construct the outcome and were excluded from the predictor set. Likewise, engineered lifestyle variables were retained while raw intermediate questionnaire variables were removed after transformation to reduce redundancy. This produced a modeling table suitable for comparing both distance-based methods and tree-based ensemble learners under a consistent feature representation. Table~\ref{tab:featuregroups} summarizes the major feature groups used by the modeling pipeline.
+
+\begin{table}[!t]
+\caption{Major Feature Groups Used in the Modeling Pipeline}
+\label{tab:featuregroups}
+\centering
+\footnotesize
+\begin{tabular}{p{0.25\linewidth}p{0.65\linewidth}}
+\toprule
+Feature group & Representative variables and purpose\\
+\midrule
+Clinical and biochemical & Age, sex, fasting blood sugar, cholesterol, triglycerides, HDL, LDL, and physical activity indicators used to represent physiological risk.\\
+Anthropometric & Waist circumference, hip circumference, BMI, and related body-composition measurements used to represent obesity and central adiposity.\\
+Lifestyle & Smoking and alcohol-level features engineered from survey responses to summarize behavioral risk.\\
+Dietary & Food-group weights and nutrient totals representing intake patterns from the individual dietary survey component.\\
+Excluded leakage variables & Raw systolic and diastolic blood-pressure variables used only for target construction and excluded from model input.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Candidate Algorithms and Optimization}
+Eight supervised learning algorithms were evaluated: k-nearest neighbors, Naive Bayes, logistic regression, random forest, AdaBoost, XGBoost, LightGBM, and CatBoost \cite{xgboost,lightgbm,catboost}. Each model was tested under multiple imbalance-handling configurations: baseline, class weights, SMOTE, SMOTENC, SMOTE with class weights, and SMOTENC with class weights \cite{chawla2002smote}. The candidate set intentionally included simple baselines and advanced ensembles so that performance improvements could be attributed to model capacity rather than to the absence of reasonable comparators.
+
+\begin{table}[!t]
+\caption{Role of Candidate Model Families in the Evaluation}
+\label{tab:modelfamilies}
+\centering
+\footnotesize
+\begin{tabular}{p{0.25\linewidth}p{0.65\linewidth}}
+\toprule
+Model family & Role in the study\\
+\midrule
+Linear/probabilistic & Logistic regression and Naive Bayes served as interpretable and probabilistic baselines.\\
+Instance-based & kNN tested whether local respondent similarity could support prediction after scaling and imputation.\\
+Bagging & Random forest provided a strong tree-based benchmark with variance reduction through aggregation.\\
+Boosting & AdaBoost, XGBoost, LightGBM, and CatBoost tested non-linear sequential learning under imbalance and calibration constraints.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A two-stage optimization strategy was used. The first stage performed broad randomized search over predefined hyperparameter distributions to identify promising regions of the search space \cite{bergstra2012random}. The second stage applied local refinement around the strongest configurations. The evaluation emphasized both discrimination and clinical screening sensitivity.
+
+The search strategy was designed to avoid over-interpreting a single validation split. Stratified sampling was used to preserve the hypertension-positive prevalence across partitions, and the same preprocessing and metric computation logic was applied to all candidate algorithms. This was important because the comparison included models with different inductive biases, including distance-based methods, probabilistic baselines, bagging ensembles, and gradient boosting methods.
+
+\subsection{Probability Calibration}
+The selected candidate models were evaluated using three post-hoc calibration approaches: Platt scaling, isotonic regression, and Venn-Abers predictors. Calibration quality was assessed using Expected Calibration Error (ECE) and log loss. ECE was computed by partitioning predictions into probability bins and comparing average confidence with empirical accuracy in each bin:
+\begin{equation}
+\mathrm{ECE}=\sum_{m=1}^{M}\frac{|B_m|}{N}\left|\mathrm{acc}(B_m)-\mathrm{conf}(B_m)\right| .
+\end{equation}
+Venn-Abers calibration was selected for the final architecture because it improved probability reliability while also providing probability intervals that communicate uncertainty around the risk estimate. The calibrated point estimate was used for the web application's displayed risk score, while the interval was used to indicate uncertainty around the prediction.
+
+For Venn-Abers prediction, the calibration mechanism fits two isotonic mappings under alternate class assumptions for the test instance. These mappings produce lower and upper probability estimates, commonly denoted as $p_0$ and $p_1$. The final displayed point estimate was computed using the minimax combination
+\begin{equation}
+p = \frac{p_1}{1-p_0+p_1}.
+\end{equation}
+This interval-based structure is useful in decision-support interfaces because it communicates that a model output is an estimate with uncertainty, not a direct medical diagnosis.
+
+\subsection{Explainability and Counterfactuals}
+SHAP was used to produce global and local explanations. Global SHAP values identified population-level risk drivers, while local SHAP waterfall plots explained individual predictions. LIME was used as a complementary local explanation method because it provides accessible feature-contribution summaries for non-technical users.
+
+Counterfactual explanations were generated using bounded Brent's optimization \cite{virtanen2020scipy}. For actionable features, the system searched for minimal feasible perturbations that would reduce modeled risk below the selected screening boundary. The optimization objective balanced threshold crossing with a variance-normalized proximity penalty:
+\begin{equation}
+L(x') = \lambda (f(x')-y_{target})^2 + \frac{(x'-x)^2}{\sigma^2},
+\end{equation}
+where $x$ is the original value, $x'$ is the proposed counterfactual value, $f(x')$ is the model-estimated risk, and $\sigma^2$ normalizes the perturbation by the feature scale. This formulation discourages unrealistic recommendations and limits counterfactual search to actionable variables.
+
+\subsection{Evaluation Protocol}
+Model performance was evaluated using both threshold-independent and threshold-dependent metrics. AUC, log loss, and ECE were used to evaluate probability scores and ranking behavior, while accuracy, recall, precision, and F1-score were used to evaluate hard classifications. Because recall is central to screening, threshold selection was treated as a separate design decision rather than a default afterthought. This distinction was important because the same probability outputs can produce different classification metrics depending on the chosen operating threshold. Table~\ref{tab:selectioncriteria} summarizes how the evaluation criteria were interpreted for screening deployment.
+
+\begin{table}[!t]
+\caption{Clinical Interpretation of Model Selection Criteria}
+\label{tab:selectioncriteria}
+\centering
+\footnotesize
+\begin{tabular}{p{0.23\linewidth}p{0.67\linewidth}}
+\toprule
+Criterion & Interpretation in this study\\
+\midrule
+Recall & Primary screening-safety criterion because false negatives represent missed hypertensive respondents.\\
+AUC & Ranking and discrimination criterion used to verify that positive cases tend to receive higher risk scores.\\
+Precision and F1 & Secondary utility criteria used to monitor false-positive burden and balance under class imbalance.\\
+ECE and log loss & Probability-reliability criteria used to evaluate whether risk scores behave like empirical probabilities.\\
+Threshold behavior & Deployment criterion used to determine the operating point of the risk-screening interface.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Web Application Prototype}
+The HRP-AI prototype was implemented as a web-based decision-support application. It includes a progressive input interface, dynamic computations such as BMI and dietary totals, calibrated risk display, uncertainty interval visualization, local and global explanations, and counterfactual suggestions. The system is intended for exploratory screening support and does not replace professional medical assessment.
+
+\subsection{Implementation and Reproducibility}
+For computational tractability, training was separated into multiple experiment notebooks grouped by algorithm family. This allowed long-running randomized searches to be executed independently while preserving a shared preprocessing and evaluation protocol. A compilation notebook then aggregated the exported metric files into the final comparison tables. This modular workflow reduced the risk of runtime interruption and made it possible to rerun a specific algorithm family or secondary experiment without repeating the full training pipeline. The same principle was applied to the sampling and threshold experiments, which were treated as controlled auxiliary analyses rather than replacements for the final model-selection process.
+
+\section{Results}
+
+\subsection{Class Distribution}
+The final dataset contained 151,189 adult respondents. Among them, 128,201 respondents (84.80\%) were classified as non-hypertensive, while 22,988 respondents (15.20\%) were classified as hypertensive. This distribution demonstrates substantial class imbalance and motivated the evaluation of imbalance-handling strategies.
+
+The imbalance ratio also explains why accuracy alone was considered insufficient. A classifier could obtain a superficially high score by favoring the majority class, yet still fail as a screening tool if it missed many hypertensive respondents. Consequently, recall, AUC, ECE, and threshold behavior were emphasized throughout the model-selection process.
+
+\subsection{Pre-Calibrated Model Performance}
+Table~\ref{tab:precal} summarizes the strongest pre-calibrated candidate models. LightGBM with class weights achieved the highest AUC of 0.8522, while XGBoost with class weights achieved the highest screening-oriented recall of 0.8788 under the threshold selected during the calibration-set threshold sweep.
+
+\begin{table}[!t]
+\caption{Top Pre-Calibrated Model Configurations}
+\label{tab:precal}
+\centering
+\footnotesize
+\begin{tabular}{lccccc}
+\toprule
+Model & Config. & Acc. & Recall & F1 & AUC\\
+\midrule
+LightGBM & CW & 0.7428 & 0.8351 & 0.4968 & 0.8522\\
+XGBoost & Base & 0.8262 & 0.5125 & 0.4728 & 0.8519\\
+Random Forest & CW & 0.7307 & 0.8553 & 0.4913 & 0.8487\\
+CatBoost & CW & 0.7300 & 0.8479 & 0.4885 & 0.8486\\
+Logistic Reg. & Base & 0.8335 & 0.4449 & 0.4483 & 0.8486\\
+XGBoost & CW & 0.7098 & \textbf{0.8788} & 0.4794 & 0.8469\\
+AdaBoost & Base & 0.7163 & 0.8671 & 0.4816 & 0.8456\\
+kNN & Base & 0.8247 & 0.4027 & 0.4112 & 0.8232\\
+Naive Bayes & Base & 0.7152 & 0.7949 & 0.4590 & 0.8094\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Because the objective was screening, model selection did not rely on AUC alone. XGBoost with class weights was retained as the final predictive engine because it provided a clinically useful compromise between sensitivity, discrimination, calibration compatibility, and deployment suitability.
+
+\subsection{Calibration and Threshold Behavior}
+Post-hoc calibration substantially reduced probability calibration error, but it also revealed a tension between calibration and classification sensitivity at the default 0.50 threshold. Several models achieved very low ECE values while suffering from low recall, indicating that calibration quality alone is insufficient for clinical screening model selection.
+
+Table~\ref{tab:threshold} shows why the XGBoost class-weighted model produced different threshold-dependent metrics under different evaluation settings. AUC, log loss, and ECE remained unchanged because the probability outputs were the same; accuracy, recall, precision, and F1 changed because the decision threshold changed.
+
+\begin{table}[!t]
+\caption{Threshold Effect on XGBoost-CW Outputs}
+\label{tab:threshold}
+\centering
+\scriptsize
+\begin{tabular}{lcccccc}
+\toprule
+Setting & Thr. & Acc. & Rec. & Prec. & F1 & AUC\\
+\midrule
+Screening & 0.35 & 0.7098 & \textbf{0.8788} & 0.3296 & 0.4794 & 0.8469\\
+Default & 0.50 & \textbf{0.7687} & 0.7651 & \textbf{0.3729} & \textbf{0.5014} & 0.8469\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Venn-Abers calibration reduced the ECE of the final calibrated XGBoost class-weighted model to 0.0035. Table~\ref{tab:calshootout} shows the post-calibration comparison among the strongest safe candidate configurations. The final deployment architecture therefore consisted of XGBoost with class weights as the predictive engine, Venn-Abers as the calibration layer, and 0.35 as the screening operating threshold.
+
+\begin{table}[!t]
+\caption{Post-Calibration Candidate Comparison}
+\label{tab:calshootout}
+\centering
+\scriptsize
+\begin{tabular}{lccccc}
+\toprule
+Model & Cal. & Acc. & Rec. & ECE & Log loss\\
+\midrule
+LightGBM-CW & V-A & 0.8506 & 0.1083 & 0.0036 & 0.3114\\
+CatBoost-CW & Iso. & 0.8491 & 0.1173 & \textbf{0.0034} & 0.3127\\
+XGBoost-CW & V-A & 0.8484 & 0.0979 & 0.0035 & 0.3140\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sampling and Threshold Experiments}
+A separate sampling-integrity experiment evaluated baseline training, class weights, SMOTE, SMOTENC, and hybrid configurations using LightGBM as a fast high-performing test engine. As shown in Table~\ref{tab:sampling}, class weights achieved the strongest sensitivity improvement without fabricating synthetic patient records. SMOTE and SMOTENC produced competitive AUC values but substantially lower recall and generated out-of-scope synthetic samples, supporting the exclusion of synthetic oversampling from the final pipeline.
+
+\begin{table}[!t]
+\caption{Sampling Strategy Experiment Using LightGBM}
+\label{tab:sampling}
+\centering
+\footnotesize
+\begin{tabular}{lcccc}
+\toprule
+Strategy & Acc. & Recall & F1 & AUC\\
+\midrule
+Baseline & \textbf{0.8516} & 0.1257 & 0.2049 & \textbf{0.8536}\\
+Class weights & 0.7295 & \textbf{0.8636} & \textbf{0.4926} & 0.8532\\
+SMOTE & 0.8418 & 0.3180 & 0.3793 & 0.8499\\
+SMOTENC & 0.8404 & 0.3263 & 0.3833 & 0.8492\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A threshold-sweep experiment further demonstrated that the default 0.50 boundary was not ideal for imbalanced screening. Lowering the threshold increased recall at the cost of specificity. At the 0.50 threshold, the threshold-sweep model was highly conservative, with recall near 0.1379 and specificity near 0.9800. More aggressive thresholds such as 0.20 or 0.10 substantially increased recall but introduced a much larger false-positive burden. The 0.35 threshold was selected as a screening operating point because it improved sensitivity while maintaining a controlled false-positive burden. This reinforces the interpretation that threshold choice is a clinical operating decision, not merely a default software setting.
+
+\subsection{Explainability and Web Application Outputs}
+Global SHAP analysis identified age, waist circumference, and BMI as important predictors, consistent with established hypertension risk factors. Local SHAP and LIME provided patient-level explanations, allowing individual predictions to be interpreted through feature contributions. The web application displayed calibrated risk, uncertainty bounds, local explanations, global feature context, and counterfactual suggestions in a structured dashboard.
+
+The prototype was organized around three user-facing functions. First, the risk module presented the calibrated probability and Venn-Abers interval so that users could distinguish the risk estimate from its uncertainty. Second, the explanation module presented local SHAP and LIME outputs to summarize why a specific respondent was assigned a given risk score. Third, the counterfactual module translated model behavior into feasible action-oriented suggestions by searching only over mutable variables. This organization was intended to reduce the gap between model performance and practical interpretability.
+
+\begin{table}[!t]
+\caption{User-Facing Modules in the HRP-AI Prototype}
+\label{tab:webmodules}
+\centering
+\footnotesize
+\begin{tabular}{p{0.23\linewidth}p{0.67\linewidth}}
+\toprule
+Module & Output and purpose\\
+\midrule
+Risk assessment & Displays the calibrated risk estimate, uncertainty interval, and screening threshold.\\
+Local explanation & Shows SHAP and LIME outputs so that feature-level drivers can be inspected for a single respondent.\\
+Global explanation & Presents population-level SHAP importance to contextualize individual explanations against dataset-wide patterns.\\
+Counterfactual guidance & Searches over actionable variables to identify feasible changes that may lower modeled risk.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+The results demonstrate that hypertension risk prediction requires more than high classification accuracy. In an imbalanced screening problem, the clinical cost of false negatives is higher than the cost of false positives. This motivated prioritizing recall, while still retaining AUC as a measure of discrimination and ECE/log loss as measures of probability reliability.
+
+The selection of class-weighted XGBoost reflects this clinical hierarchy. Although LightGBM achieved the highest AUC, XGBoost with class weights offered a more deployment-suitable balance between sensitivity, discrimination, and calibration behavior. The observed discrepancy between pre-calibrated and base post-calibration metrics was explained by thresholding, not by a change in probability outputs. This distinction is important because threshold-dependent metrics must be interpreted relative to the operating point.
+
+The calibration results also highlight the need to interpret ECE in context. Extremely low ECE values can coincide with poor sensitivity at the default threshold. Therefore, calibration should not be evaluated in isolation. Instead, screening systems should jointly consider discrimination, calibration, recall, and threshold behavior.
+
+The integration of SHAP, LIME, and counterfactual explanations further addresses the transparency problem of black-box models. SHAP provides global and local feature attribution, LIME gives accessible local summaries, and counterfactual optimization translates predictions into possible action. Together, these outputs support interpretability while preserving the probability-aware nature of the calibrated model.
+
+From a deployment perspective, the proposed workflow separates risk estimation from diagnosis. The model estimates the probability that a respondent profile resembles hypertension-positive cases in the survey-derived data, while the actual diagnosis of hypertension still requires direct blood-pressure measurement and professional interpretation. This distinction is important because the application is intended to support screening, counseling, and prioritization rather than to replace the clinical workflow. The 0.35 threshold should therefore be interpreted as a risk-escalation boundary for the application interface rather than as a clinical blood-pressure threshold.
+
+The results also show that calibration must be paired with an explicit threshold policy. A calibrated probability distribution can become conservative at the default 0.50 boundary when the positive class prevalence is low. In such cases, retaining the default boundary may hide useful ranking behavior and reduce clinical sensitivity. The study therefore treats calibration, ranking performance, and decision threshold as three separate but interacting components of the deployed model.
+
+In practical use, the most defensible role of HRP-AI is as a triage and education layer. A high-risk output should prompt follow-up measurement, clinical review, or lifestyle counseling rather than an automatic diagnosis. Conversely, a low-risk output should not be interpreted as immunity from hypertension, especially for users with symptoms or repeated elevated blood-pressure readings. This framing keeps the system aligned with the intended role of machine learning in public-health screening: to prioritize attention, explain risk factors, and support earlier engagement with care.
+
+
+
+\subsection{Implications for Public-Health Deployment}
+The proposed pipeline shows that national nutrition survey data can be transformed into a practical screening prototype when preprocessing, leakage control, imbalance handling, calibration, and threshold selection are treated as core modeling decisions. Because the NNS contains heterogeneous variables collected for surveillance rather than direct machine-learning deployment, model usefulness depends on the entire pipeline rather than on the classifier alone.
+
+The output of HRP-AI should therefore be interpreted as a layered decision-support signal rather than a binary diagnosis. The calibrated probability estimates modeled risk, the Venn-Abers interval communicates uncertainty, SHAP and LIME explain major contributing factors, and the counterfactual module suggests possible lifestyle-oriented directions. Separating the probability model from the operating threshold also allows future deployments to tune sensitivity and false-positive burden for different screening contexts.
+
+\section{Limitations and Future Work}
+This study has several limitations. First, the model was trained on cross-sectional survey data, so the system estimates risk association rather than causal disease progression. Second, some dietary variables depend on self-reported recall and may contain measurement error. Third, the final operating threshold was selected empirically from retrospective data and should be externally validated before clinical use. Fourth, the prototype was evaluated as a decision-support system and not as a replacement for blood pressure measurement or physician diagnosis.
+
+Future work should include prospective validation with new respondents, external validation on other Philippine clinical or public-health datasets, and usability testing with clinicians and target users. Additional work may also investigate subgroup calibration, fairness across demographic groups, and decision-curve analysis for selecting thresholds under explicit assumptions about false-negative and false-positive costs.
+
+\section{Conclusion}
+This paper presented HRP-AI, a calibrated and explainable web-based system for hypertension risk prediction among Filipino adults. Using the 2015 DOST-FNRI National Nutrition Survey, eight machine learning algorithms were evaluated under multiple imbalance-handling configurations. XGBoost with class weights was selected as the predictive engine, achieving 76.87\% accuracy, 76.51\% recall, an F1-score of 0.5014, and an AUC of 0.8469 at the standard 0.50 threshold. At the selected 0.35 screening threshold, recall increased to 87.88\%. Venn-Abers calibration reduced ECE to 0.0035.
+
+The resulting prototype combines calibrated risk scores, uncertainty bounds, SHAP and LIME explanations, and bounded counterfactual suggestions. The system demonstrates that non-linear machine learning models can be made more suitable for exploratory screening when their predictions are calibrated, explained, and evaluated under clinically meaningful threshold behavior. The study also illustrates that an application-level risk threshold should be treated as a configurable screening policy rather than a fixed diagnostic rule, enabling future deployments to tune sensitivity and specificity according to local clinical workflow requirements. Future work should validate the system prospectively, test external generalizability, evaluate usability, and examine whether calibrated counterfactual outputs improve understanding of modifiable hypertension risk factors. The workflow is most useful in settings where a direct clinical diagnosis is not yet available but early prioritization is needed. Because the displayed probability, uncertainty interval, and explanations are presented together, the interface can help users distinguish between the model's estimated risk and the clinical action that should follow. This design also makes the system easier to audit, since future work can separately inspect discrimination, calibration, explanation stability, and threshold policy.
+
+\balance
+\bibliographystyle{IEEEtran}
+
+\begin{thebibliography}{99}
+
+\bibitem{ona2021executive}
+D. I. D. Ona \emph{et al.}, ``Executive summary of the 2020 clinical practice guidelines for the management of hypertension in the Philippines,'' \emph{J. Clin. Hypertension}, vol. 23, no. 8, pp. 1637--1650, 2021.
+
+\bibitem{nnsClinical2015}
+Department of Science and Technology--Food and Nutrition Research Institute, ``2015 National Nutrition Survey (NNS) metadata documentation: Clinical and Health,'' DOST-FNRI, 2015.
+
+\bibitem{naik2025artificial}
+A. Naik \emph{et al.}, ``Artificial intelligence and digital twins for the personalised prediction of hypertension risk,'' \emph{Computers in Biology and Medicine}, vol. 196, p. 110718, 2025.
+
+\bibitem{pandey2025development}
+S. Pandey, A. Pandey, A. Neupane, D. Subedi, and A. Guragain, ``Development of a hypertension risk prediction model using nationally representative survey data: A machine learning approach and web application deployment,'' \emph{medRxiv}, 2025.
+
+\bibitem{lofstrom2023primer}
+H. L\"ofstr\"om, T. L\"ofstr\"om, and U. Johansson, ``Calibrated explanations---A primer,'' \emph{arXiv preprint arXiv:2305.04344}, 2023.
+
+\bibitem{lofstrom2024calibrated_uncertainty}
+H. L\"ofstr\"om, T. L\"ofstr\"om, U. Johansson, and C. S\"onstr\"od, ``Calibrated explanations: With uncertainty information and counterfactuals,'' \emph{Expert Syst. Appl.}, vol. 246, p. 123154, 2024.
+
+\bibitem{shap}
+S. M. Lundberg and S.-I. Lee, ``A unified approach to interpreting model predictions,'' in \emph{Advances in Neural Information Processing Systems 30}, pp. 4765--4774, 2017.
+
+\bibitem{ribeiro2016lime}
+M. T. Ribeiro, S. Singh, and C. Guestrin, ``Why should I trust you?: Explaining the predictions of any classifier,'' in \emph{Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining}, pp. 1135--1144, 2016.
+
+\bibitem{wachter2017counterfactual}
+S. Wachter, B. Mittelstadt, and C. Russell, ``Counterfactual explanations without opening the black box: Automated decisions and the GDPR,'' \emph{Harvard J. Law \& Technol.}, vol. 31, no. 2, pp. 841--887, 2017.
+
+\bibitem{xgboost}
+T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting system,'' in \emph{Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining}, pp. 785--794, 2016, doi: 10.1145/2939672.2939785.
+
+\bibitem{chawla2002smote}
+N. V. Chawla, K. W. Bowyer, L. O. Hall, and W. P. Kegelmeyer, ``SMOTE: Synthetic minority over-sampling technique,'' \emph{J. Artif. Intell. Res.}, vol. 16, pp. 321--357, 2002.
+
+\bibitem{bergstra2012random}
+J. Bergstra and Y. Bengio, ``Random search for hyper-parameter optimization,'' \emph{J. Mach. Learn. Res.}, vol. 13, no. 2, pp. 281--305, 2012.
+
+\bibitem{virtanen2020scipy}
+P. Virtanen \emph{et al.}, ``SciPy 1.0: Fundamental algorithms for scientific computing in Python,'' \emph{Nature Methods}, vol. 17, no. 3, pp. 261--272, 2020.
+
+\bibitem{catboost}
+L. Prokhorenkova, G. Gusev, A. Vorobev, A. V. Dorogush, and A. Gulin, ``CatBoost: Unbiased boosting with categorical features,'' in \emph{Advances in Neural Information Processing Systems 31}, pp. 6638--6648, 2018.
+
+\bibitem{lightgbm}
+G. Ke \emph{et al.}, ``LightGBM: A highly efficient gradient boosting decision tree,'' in \emph{Advances in Neural Information Processing Systems 30}, pp. 3146--3154, 2017.
+
+\end{thebibliography}
+
+\end{document}

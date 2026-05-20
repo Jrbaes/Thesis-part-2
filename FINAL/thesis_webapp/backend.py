@@ -12,10 +12,19 @@ from venn_abers import VennAbers
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+TRAINING_ROOT = PROJECT_ROOT / "training"
+
+
+def _first_existing(paths: list[Path], fallback: Path) -> Path:
+    return next((path for path in paths if path.exists()), fallback)
 
 
 # ── Auto-select best EXP3 bundle from updated runs (A/B/C/D) ─────────────────
 _EXP3_CANDIDATES = [
+    ("exp3_knn_rf", TRAINING_ROOT / "exp3_knn_rf"),
+    ("exp3_xgb_ada", TRAINING_ROOT / "exp3_xgb_ada"),
+    ("exp3_logreg_cat", TRAINING_ROOT / "exp3_logreg_cat"),
+    ("exp3_naive_bayes", TRAINING_ROOT / "exp3_naive_bayes"),
     ("exp3_knn_rf", PROJECT_ROOT / "exp3_knn_rf"),
     ("exp3_xgb_ada", PROJECT_ROOT / "exp3_xgb_ada"),
     ("exp3_logreg_cat", PROJECT_ROOT / "exp3_logreg_cat"),
@@ -51,13 +60,25 @@ def _select_best_exp3_bundle() -> Path | None:
 
 EXP3_BUNDLE_PATH = _select_best_exp3_bundle()
 
-# Fall back to old GPU-exp2 artifacts when the EXP3-C bundle has not been
-# generated yet (run the save cell in EXP3_C_LogReg_CatBoost.ipynb first).
-_OLD_MODEL_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib"
-_OLD_PREPROCESSOR_PATH = PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib"
+# Fall back to old GPU-exp2 artifacts when EXP3 bundles are unavailable.
+_OLD_MODEL_CANDIDATES = [
+    PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib",
+    PROJECT_ROOT.parent / "gpu_rf_xgb_cat_exp2_artifacts" / "models" / "calibrated_top_models" / "top3_catboost_isotonic.joblib",
+]
+_OLD_PREPROCESSOR_CANDIDATES = [
+    PROJECT_ROOT / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib",
+    PROJECT_ROOT.parent / "gpu_rf_xgb_cat_exp2_artifacts" / "preprocessor.joblib",
+]
+
+_OLD_MODEL_PATH = _first_existing(_OLD_MODEL_CANDIDATES, _OLD_MODEL_CANDIDATES[0])
+_OLD_PREPROCESSOR_PATH = _first_existing(_OLD_PREPROCESSOR_CANDIDATES, _OLD_PREPROCESSOR_CANDIDATES[0])
 
 # Pinned to EXP3-B (XGBoost cw base) — best recall (76.5%) across updated runs.
-_PINNED_BUNDLE = PROJECT_ROOT / "exp3_xgb_ada" / "models" / "best_model_bundle.joblib"
+_PINNED_BUNDLE_CANDIDATES = [
+    TRAINING_ROOT / "exp3_xgb_ada" / "models" / "best_model_bundle.joblib",
+    PROJECT_ROOT / "exp3_xgb_ada" / "models" / "best_model_bundle.joblib",
+]
+_PINNED_BUNDLE = _first_existing(_PINNED_BUNDLE_CANDIDATES, _PINNED_BUNDLE_CANDIDATES[0])
 
 DEFAULT_MODEL_PATH = _PINNED_BUNDLE if _PINNED_BUNDLE.exists() else (EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH is not None and EXP3_BUNDLE_PATH.exists() else _OLD_MODEL_PATH)
 DEFAULT_PREPROCESSOR_PATH = _PINNED_BUNDLE if _PINNED_BUNDLE.exists() else (EXP3_BUNDLE_PATH if EXP3_BUNDLE_PATH is not None and EXP3_BUNDLE_PATH.exists() else _OLD_PREPROCESSOR_PATH)

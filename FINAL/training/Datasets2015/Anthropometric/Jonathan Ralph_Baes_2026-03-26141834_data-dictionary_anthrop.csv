@@ -1,0 +1,141 @@
+formno,variable_name,variable_label,var_value,value_label
+form21_2015,mos_lactation,Months of Lactation,10,Lactating, 0-6months 
+form21_2015,mos_lactation,Months of Lactation,11,Lactating, 7-12months 
+form21_2015,mos_lactation,Months of Lactation,12,Lactating, over 1year
+form21_2015,weight,Average Weight (kg),,
+form21_2015,waist,Ave Waist Circumference (cm),,
+form21_2015,strrec,Strata,,
+form21_2015,sex,Sex of Respondent,1,Male
+form21_2015,sex,Sex of Respondent,2,Female
+form21_2015,regcode,Name of Regions,1,ILOCOS REGION
+form21_2015,regcode,Name of Regions,2,CAGAYAN VALLEY
+form21_2015,regcode,Name of Regions,3,CENTRAL LUZON
+form21_2015,regcode,Name of Regions,5,BICOL
+form21_2015,regcode,Name of Regions,6,WESTERN VISAYAS
+form21_2015,regcode,Name of Regions,7,CENTRAL VISAYAS
+form21_2015,regcode,Name of Regions,8,EASTERN VISAYAS
+form21_2015,regcode,Name of Regions,9,ZAMBOANGA PENINSULA
+form21_2015,regcode,Name of Regions,10,NORTHERN MINDANAO
+form21_2015,regcode,Name of Regions,11,DAVAO REGION
+form21_2015,regcode,Name of Regions,12,SOCCSKSARGEN
+form21_2015,regcode,Name of Regions,13,NATIONAL CAPITAL REGION
+form21_2015,regcode,Name of Regions,14,CORDILLERA ADMINISTRATIVE REGION
+form21_2015,regcode,Name of Regions,15,ARMM
+form21_2015,regcode,Name of Regions,16,CARAGA
+form21_2015,regcode,Name of Regions,41,CALABARZON
+form21_2015,regcode,Name of Regions,42,MIMAROPA
+form21_2015,psurec,Primary Sampling Unit,,
+form21_2015,psc,Physiological Status Code,0,NP/NL
+form21_2015,psc,Physiological Status Code,1,Pregnant
+form21_2015,psc,Physiological Status Code,2,Lactating
+form21_2015,psc,Physiological Status Code,99,Male
+form21_2015,provcode,Name of Provinces,1,ABRA
+form21_2015,provcode,Name of Provinces,2,AGUSAN DEL NORTE
+form21_2015,provcode,Name of Provinces,3,AGUSAN DEL SUR
+form21_2015,provcode,Name of Provinces,4,AKLAN
+form21_2015,provcode,Name of Provinces,5,ALBAY
+form21_2015,provcode,Name of Provinces,6,ANTIQUE
+form21_2015,provcode,Name of Provinces,7,BASILAN
+form21_2015,provcode,Name of Provinces,8,BATAAN
+form21_2015,provcode,Name of Provinces,10,BATANGAS
+form21_2015,provcode,Name of Provinces,11,BENGUET
+form21_2015,provcode,Name of Provinces,12,BOHOL
+form21_2015,provcode,Name of Provinces,13,BUKIDNON
+form21_2015,provcode,Name of Provinces,14,BULACAN
+form21_2015,provcode,Name of Provinces,15,CAGAYAN
+form21_2015,provcode,Name of Provinces,16,CAMARINES NORTE
+form21_2015,provcode,Name of Provinces,17,CAMARINES SUR
+form21_2015,provcode,Name of Provinces,18,CAMIGUIN
+form21_2015,provcode,Name of Provinces,19,CAPIZ
+form21_2015,provcode,Name of Provinces,20,CATANDUANES
+form21_2015,provcode,Name of Provinces,21,CAVITE
+form21_2015,provcode,Name of Provinces,22,CEBU
+form21_2015,provcode,Name of Provinces,23,DAVAO (DAVAO DEL NORTE)
+form21_2015,provcode,Name of Provinces,24,DAVAO DEL SUR
+form21_2015,provcode,Name of Provinces,25,DAVAO ORIENTAL
+form21_2015,provcode,Name of Provinces,26,EASTERN SAMAR
+form21_2015,provcode,Name of Provinces,27,IFUGAO
+form21_2015,provcode,Name of Provinces,28,ILOCOS NORTE
+form21_2015,provcode,Name of Provinces,29,ILOCOS SUR
+form21_2015,provcode,Name of Provinces,30,ILOILO
+form21_2015,provcode,Name of Provinces,31,ISABELA
+form21_2015,provcode,Name of Provinces,32,KALINGA
+form21_2015,provcode,Name of Provinces,33,LA UNION
+form21_2015,provcode,Name of Provinces,34,LAGUNA
+form21_2015,provcode,Name of Provinces,35,LANAO DEL NORTE
+form21_2015,provcode,Name of Provinces,36,LANAO DEL SUR
+form21_2015,provcode,Name of Provinces,37,LEYTE
+form21_2015,provcode,Name of Provinces,38,MAGUINDANAO
+form21_2015,provcode,Name of Provinces,39,NCR - MANILA FIRST DISTRICT
+form21_2015,provcode,Name of Provinces,40,MARINDUQUE
+form21_2015,provcode,Name of Provinces,41,MASBATE
+form21_2015,provcode,Name of Provinces,42,MISAMIS OCCIDENTAL
+form21_2015,provcode,Name of Provinces,43,MISAMIS ORIENTAL
+form21_2015,provcode,Name of Provinces,44,MOUNTAIN PROVINCE
+form21_2015,provcode,Name of Provinces,45,NEGROS OCCIDENTAL
+form21_2015,provcode,Name of Provinces,46,NEGROS ORIENTAL
+form21_2015,provcode,Name of Provinces,47,NORTH COTABATO
+form21_2015,provcode,Name of Provinces,48,NORTHERN SAMAR
+form21_2015,provcode,Name of Provinces,49,NUEVA ECIJA
+form21_2015,provcode,Name of Provinces,50,NUEVA VIZCAYA
+form21_2015,provcode,Name of Provinces,51,OCCIDENTAL MINDORO
+form21_2015,provcode,Name of Provinces,52,ORIENTAL MINDORO
+form21_2015,provcode,Name of Provinces,53,PALAWAN
+form21_2015,provcode,Name of Provinces,54,PAMPANGA
+form21_2015,provcode,Name of Provinces,55,PANGASINAN
+form21_2015,provcode,Name of Provinces,56,QUEZON
+form21_2015,provcode,Name of Provinces,57,QUIRINO
+form21_2015,provcode,Name of Provinces,58,RIZAL
+form21_2015,provcode,Name of Provinces,59,ROMBLON
+form21_2015,provcode,Name of Provinces,60,WESTERN SAMAR
+form21_2015,provcode,Name of Provinces,61,SIQUIJOR
+form21_2015,provcode,Name of Provinces,62,SORSOGON
+form21_2015,provcode,Name of Provinces,63,SOUTH COTABATO
+form21_2015,provcode,Name of Provinces,64,SOUTHERN LEYTE
+form21_2015,provcode,Name of Provinces,65,SULTAN KUDARAT
+form21_2015,provcode,Name of Provinces,66,SULU
+form21_2015,provcode,Name of Provinces,67,SURIGAO DEL NORTE
+form21_2015,provcode,Name of Provinces,68,SURIGAO DEL SUR
+form21_2015,provcode,Name of Provinces,69,TARLAC
+form21_2015,provcode,Name of Provinces,70,TAWI-TAWI
+form21_2015,provcode,Name of Provinces,71,ZAMBALES
+form21_2015,provcode,Name of Provinces,72,ZAMBOANGA DEL NORTE
+form21_2015,provcode,Name of Provinces,73,ZAMBOANGA DEL SUR
+form21_2015,provcode,Name of Provinces,74,NCR SECOND DISTRICT
+form21_2015,provcode,Name of Provinces,75,NCR THIRD DISTRICT
+form21_2015,provcode,Name of Provinces,76,NCR FOURTH DISTRICT
+form21_2015,provcode,Name of Provinces,77,AURORA
+form21_2015,provcode,Name of Provinces,78,BILIRAN
+form21_2015,provcode,Name of Provinces,79,GUIMARAS
+form21_2015,provcode,Name of Provinces,80,SARANGANI
+form21_2015,provcode,Name of Provinces,81,APAYAO
+form21_2015,provcode,Name of Provinces,82,COMPOSTELA VALLEY
+form21_2015,provcode,Name of Provinces,83,ZAMBOANGA SIBUGAY
+form21_2015,provcode,Name of Provinces,97,ISABELA CITY
+form21_2015,provcode,Name of Provinces,98,COTABATO CITY
+form21_2015,mos_preg,Months of Pregnancy,1,Pregnant, 1 Month
+form21_2015,mos_preg,Months of Pregnancy,2,Pregnant, 2 Months
+form21_2015,mos_preg,Months of Pregnancy,3,Pregnant, 3 Months
+form21_2015,mos_preg,Months of Pregnancy,4,Pregnant, 4 Months
+form21_2015,mos_preg,Months of Pregnancy,5,Pregnant, 5 Months
+form21_2015,mos_preg,Months of Pregnancy,6,Pregnant, 6 Months
+form21_2015,mos_preg,Months of Pregnancy,7,Pregnant, 7 Months
+form21_2015,mos_preg,Months of Pregnancy,8,Pregnant, 8 Months
+form21_2015,mos_preg,Months of Pregnancy,9,Pregnant, 9 Months
+form21_2015,age,Age in Years,,
+form21_2015,member_code,Member Code (Unique identifier; merging variable),,
+form21_2015,hip,Ave Hip Circumference (cm),,
+form21_2015,hhnum,Household Number (Unique identifier; merging variable),,
+form21_2015,height,Average Height (cm),,
+form21_2015,fwgt,Sampling Weights,,
+form21_2015,ethnicity,Ethnicity,0,No, Not an IP/Without Foreign Blood
+form21_2015,ethnicity,Ethnicity,1,Yes, Indigenous People   
+form21_2015,ethnicity,Ethnicity,2,Yes, 2/3 Filipino   
+form21_2015,ethnicity,Ethnicity,3,Yes, with 1/2 Foreign Blood 
+form21_2015,anthro_group,Anthrop Group,1,0-60 Months Old
+form21_2015,anthro_group,Anthrop Group,2,61-120 Months Old
+form21_2015,anthro_group,Anthrop Group,3,121-228 Months Old
+form21_2015,anthro_group,Anthrop Group,4,Adults (19 Years Old and Above)
+form21_2015,anthro_group,Anthrop Group,7,Pregnant Mothers
+form21_2015,anthro_group,Anthrop Group,8,Lactating Women
+form21_2015,agemos,Age of the Child (in Months),,

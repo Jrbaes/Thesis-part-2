@@ -1,0 +1,193 @@
+rank,experiment,rank,sampling,model,calibration,accuracy,recall,precision,f1,auc,logloss,ece,combined
+1,A · KNN / RF,1,cw,randomforest,base,0.7968,0.6774,0.4005,0.5034,0.8487,0.3691,0.1171,0.747
+2,B · XGBoost / AdaBoost,1,cw,xgboost,base,0.7687,0.7651,0.3729,0.5014,0.8469,0.4118,0.1493,0.743175
+3,C · LogReg / CatBoost,1,smote,catboost,base,0.7521,0.7822,0.3564,0.4897,0.8375,0.4139,0.1577,0.740675
+4,C · LogReg / CatBoost,2,smotenc,catboost,base,0.7521,0.7822,0.3564,0.4897,0.8375,0.4139,0.1577,0.740675
+5,C · LogReg / CatBoost,3,smotecw,catboost,base,0.7521,0.7822,0.3564,0.4897,0.8375,0.4139,0.1577,0.740675
+6,C · LogReg / CatBoost,4,smotencw,catboost,base,0.7521,0.7822,0.3564,0.4897,0.8375,0.4139,0.1577,0.740675
+7,B · XGBoost / AdaBoost,2,smote,xgboost,base,0.7919,0.6356,0.3875,0.4815,0.8378,0.3704,0.1095,0.7369
+8,B · XGBoost / AdaBoost,3,smotenc,xgboost,base,0.7919,0.6356,0.3875,0.4815,0.8378,0.3704,0.1095,0.7369
+9,B · XGBoost / AdaBoost,4,smotecw,xgboost,base,0.7919,0.6356,0.3875,0.4815,0.8378,0.3704,0.1095,0.7369
+10,B · XGBoost / AdaBoost,5,smotencw,xgboost,base,0.7919,0.6356,0.3875,0.4815,0.8378,0.3704,0.1095,0.7369
+11,C · LogReg / CatBoost,5,smote,lightgbm,base,0.7905,0.6382,0.3858,0.4809,0.8378,0.3705,0.1111,0.736775
+12,C · LogReg / CatBoost,6,smotenc,lightgbm,base,0.7905,0.6382,0.3858,0.4809,0.8378,0.3705,0.1111,0.736775
+13,C · LogReg / CatBoost,7,smotecw,lightgbm,base,0.7905,0.6382,0.3858,0.4809,0.8378,0.3705,0.1111,0.736775
+14,C · LogReg / CatBoost,8,smotencw,lightgbm,base,0.7905,0.6382,0.3858,0.4809,0.8378,0.3705,0.1111,0.736775
+15,C · LogReg / CatBoost,9,cw,catboost,base,0.73,0.8479,0.3431,0.4885,0.8486,0.456,0.1877,0.73355
+16,A · KNN / RF,2,smotecw,randomforest,base,0.7692,0.7042,0.3656,0.4813,0.8346,0.4044,0.1386,0.7326
+17,A · KNN / RF,3,smotencw,randomforest,base,0.7692,0.7042,0.3656,0.4813,0.8346,0.4044,0.1386,0.7326
+18,A · KNN / RF,4,smote,randomforest,base,0.7716,0.6891,0.3665,0.4785,0.8347,0.4003,0.1356,0.7312
+19,A · KNN / RF,5,smotenc,randomforest,base,0.7716,0.6891,0.3665,0.4785,0.8347,0.4003,0.1356,0.7312
+20,C · LogReg / CatBoost,10,cw,lightgbm,base,0.7221,0.8686,0.3386,0.4872,0.8522,0.4691,0.1999,0.730425
+21,C · LogReg / CatBoost,11,smote,logreg,base,0.7427,0.831,0.353,0.4955,0.8483,0.493,0.2078,0.718225
+22,C · LogReg / CatBoost,12,smotenc,logreg,base,0.7427,0.831,0.353,0.4955,0.8483,0.493,0.2078,0.718225
+23,C · LogReg / CatBoost,13,smotecw,logreg,base,0.7427,0.831,0.353,0.4955,0.8483,0.493,0.2078,0.718225
+24,C · LogReg / CatBoost,14,smotencw,logreg,base,0.7427,0.831,0.353,0.4955,0.8483,0.493,0.2078,0.718225
+25,B · XGBoost / AdaBoost,6,smote,adaboost,base,0.7423,0.802,0.3489,0.4863,0.8306,0.4663,0.2067,0.717825
+26,B · XGBoost / AdaBoost,7,smotenc,adaboost,base,0.7423,0.802,0.3489,0.4863,0.8306,0.4663,0.2067,0.717825
+27,B · XGBoost / AdaBoost,8,smotecw,adaboost,base,0.7423,0.802,0.3489,0.4863,0.8306,0.4663,0.2067,0.717825
+28,B · XGBoost / AdaBoost,9,smotencw,adaboost,base,0.7423,0.802,0.3489,0.4863,0.8306,0.4663,0.2067,0.717825
+29,C · LogReg / CatBoost,15,cw,logreg,base,0.7389,0.8366,0.3499,0.4935,0.8484,0.495,0.2134,0.7167749999999999
+30,B · XGBoost / AdaBoost,10,cw,adaboost,base,0.7195,0.8645,0.3358,0.4837,0.8226,0.5745,0.234,0.693875
+31,A · KNN / RF,6,smote,knn,base,0.6998,0.8471,0.3174,0.4618,0.8203,0.5532,0.2246,0.692275
+32,A · KNN / RF,7,smotenc,knn,base,0.6998,0.8471,0.3174,0.4618,0.8203,0.5532,0.2246,0.692275
+33,A · KNN / RF,8,smotecw,knn,base,0.6998,0.8471,0.3174,0.4618,0.8203,0.5532,0.2246,0.692275
+34,A · KNN / RF,9,smotencw,knn,base,0.6998,0.8471,0.3174,0.4618,0.8203,0.5532,0.2246,0.692275
+35,C · LogReg / CatBoost,16,base,lightgbm,platt,0.8488,0.2323,0.5057,0.3184,0.8521,0.3237,0.0277,0.682425
+36,B · XGBoost / AdaBoost,11,base,xgboost,platt,0.8493,0.2275,0.5097,0.3146,0.8519,0.3244,0.029,0.68085
+37,A · KNN / RF,10,cw,randomforest,platt,0.848,0.2097,0.5003,0.2955,0.8487,0.3189,0.0183,0.6801250000000001
+38,C · LogReg / CatBoost,17,base,catboost,platt,0.8505,0.199,0.5217,0.2881,0.8483,0.3203,0.0136,0.6789000000000001
+39,C · LogReg / CatBoost,18,smote,logreg,platt,0.8476,0.1977,0.497,0.2829,0.8483,0.3179,0.015,0.6780999999999999
+40,C · LogReg / CatBoost,19,smotenc,logreg,platt,0.8476,0.1977,0.497,0.2829,0.8483,0.3179,0.015,0.6780999999999999
+41,C · LogReg / CatBoost,20,smotecw,logreg,platt,0.8476,0.1977,0.497,0.2829,0.8483,0.3179,0.015,0.6780999999999999
+42,C · LogReg / CatBoost,21,smotencw,logreg,platt,0.8476,0.1977,0.497,0.2829,0.8483,0.3179,0.015,0.6780999999999999
+43,C · LogReg / CatBoost,22,cw,logreg,platt,0.848,0.196,0.5003,0.2817,0.8484,0.3173,0.0144,0.6780750000000001
+44,B · XGBoost / AdaBoost,12,cw,xgboost,platt,0.8466,0.1864,0.4883,0.2698,0.8469,0.3204,0.0129,0.674925
+45,C · LogReg / CatBoost,23,base,logreg,base,0.8486,0.1869,0.5059,0.2729,0.8486,0.3168,0.0191,0.6749
+46,A · KNN / RF,11,base,randomforest,platt,0.8451,0.2034,0.4775,0.2853,0.8435,0.33,0.0275,0.67275
+47,C · LogReg / CatBoost,24,base,lightgbm,venn_abers,0.8503,0.1497,0.5268,0.2331,0.8518,0.3101,0.0038,0.6715249999999999
+48,C · LogReg / CatBoost,25,base,lightgbm,isotonic,0.8504,0.1497,0.5276,0.2332,0.8517,0.3101,0.0043,0.6714249999999999
+49,C · LogReg / CatBoost,26,base,logreg,venn_abers,0.8489,0.1488,0.5101,0.2304,0.8482,0.3128,0.0044,0.6701250000000001
+50,C · LogReg / CatBoost,27,base,logreg,isotonic,0.8488,0.1484,0.5093,0.2298,0.8482,0.3132,0.0047,0.669825
+51,B · XGBoost / AdaBoost,13,base,adaboost,platt,0.8486,0.1668,0.5063,0.251,0.8456,0.3177,0.02,0.669425
+52,A · KNN / RF,12,cw,randomforest,isotonic,0.8488,0.1468,0.5094,0.228,0.8483,0.313,0.005,0.6694
+53,A · KNN / RF,13,cw,randomforest,venn_abers,0.8488,0.1471,0.5098,0.2283,0.8485,0.3138,0.0055,0.66915
+54,B · XGBoost / AdaBoost,14,base,adaboost,venn_abers,0.849,0.1449,0.5119,0.2258,0.8454,0.3142,0.0044,0.668825
+55,B · XGBoost / AdaBoost,15,base,adaboost,isotonic,0.8489,0.1434,0.5112,0.2239,0.8454,0.3143,0.0042,0.66845
+56,C · LogReg / CatBoost,28,cw,logreg,venn_abers,0.8486,0.1434,0.5069,0.2235,0.848,0.3129,0.0061,0.66825
+57,C · LogReg / CatBoost,29,cw,logreg,isotonic,0.8486,0.1431,0.5073,0.2233,0.8478,0.3133,0.0058,0.66815
+58,A · KNN / RF,14,base,randomforest,isotonic,0.8486,0.1484,0.5074,0.2296,0.8432,0.319,0.0065,0.667875
+59,A · KNN / RF,15,base,randomforest,venn_abers,0.8486,0.1486,0.5074,0.2299,0.8433,0.3189,0.0075,0.6677
+60,B · XGBoost / AdaBoost,16,base,xgboost,venn_abers,0.8502,0.1344,0.5287,0.2144,0.8518,0.3103,0.0056,0.667175
+61,C · LogReg / CatBoost,30,base,logreg,platt,0.8485,0.2064,0.504,0.2929,0.8486,0.3382,0.0485,0.66705
+62,A · KNN / RF,16,base,randomforest,base,0.8484,0.1457,0.5053,0.2262,0.8435,0.3185,0.009,0.66665
+63,C · LogReg / CatBoost,31,cw,catboost,venn_abers,0.8494,0.1353,0.5183,0.2146,0.8485,0.3146,0.0037,0.6666
+64,B · XGBoost / AdaBoost,17,base,xgboost,isotonic,0.85,0.1281,0.5278,0.2062,0.8518,0.3104,0.0051,0.66565
+65,C · LogReg / CatBoost,32,cw,catboost,platt,0.8495,0.1327,0.5191,0.2114,0.8486,0.3157,0.0065,0.665
+66,B · XGBoost / AdaBoost,18,base,xgboost,base,0.8502,0.119,0.5321,0.1945,0.8519,0.3098,0.0027,0.664175
+67,C · LogReg / CatBoost,33,smote,logreg,venn_abers,0.8479,0.1273,0.4991,0.2028,0.8481,0.313,0.0066,0.6638999999999999
+68,C · LogReg / CatBoost,34,smotenc,logreg,venn_abers,0.8479,0.1273,0.4991,0.2028,0.8481,0.313,0.0066,0.6638999999999999
+69,C · LogReg / CatBoost,35,smotecw,logreg,venn_abers,0.8479,0.1273,0.4991,0.2028,0.8481,0.313,0.0066,0.6638999999999999
+70,C · LogReg / CatBoost,36,smotencw,logreg,venn_abers,0.8479,0.1273,0.4991,0.2028,0.8481,0.313,0.0066,0.6638999999999999
+71,C · LogReg / CatBoost,37,smote,logreg,isotonic,0.8479,0.1264,0.4991,0.2017,0.848,0.3134,0.0058,0.663775
+72,C · LogReg / CatBoost,38,smotenc,logreg,isotonic,0.8479,0.1264,0.4991,0.2017,0.848,0.3134,0.0058,0.663775
+73,C · LogReg / CatBoost,39,smotecw,logreg,isotonic,0.8479,0.1264,0.4991,0.2017,0.848,0.3134,0.0058,0.663775
+74,C · LogReg / CatBoost,40,smotencw,logreg,isotonic,0.8479,0.1264,0.4991,0.2017,0.848,0.3134,0.0058,0.663775
+75,C · LogReg / CatBoost,41,base,lightgbm,base,0.85,0.1157,0.5299,0.19,0.8521,0.3095,0.0041,0.663025
+76,C · LogReg / CatBoost,42,base,catboost,venn_abers,0.8506,0.1203,0.539,0.1967,0.8482,0.3133,0.0065,0.662775
+77,B · XGBoost / AdaBoost,19,smote,xgboost,platt,0.8427,0.1627,0.4522,0.2393,0.8378,0.3284,0.0263,0.662675
+78,B · XGBoost / AdaBoost,20,smotenc,xgboost,platt,0.8427,0.1627,0.4522,0.2393,0.8378,0.3284,0.0263,0.662675
+79,B · XGBoost / AdaBoost,21,smotecw,xgboost,platt,0.8427,0.1627,0.4522,0.2393,0.8378,0.3284,0.0263,0.662675
+80,B · XGBoost / AdaBoost,22,smotencw,xgboost,platt,0.8427,0.1627,0.4522,0.2393,0.8378,0.3284,0.0263,0.662675
+81,C · LogReg / CatBoost,43,cw,catboost,isotonic,0.8491,0.1173,0.5168,0.1911,0.8485,0.3127,0.0034,0.662575
+82,C · LogReg / CatBoost,44,base,catboost,isotonic,0.8505,0.119,0.5368,0.1948,0.8481,0.3132,0.0061,0.66255
+83,C · LogReg / CatBoost,45,cw,lightgbm,venn_abers,0.8506,0.1083,0.5425,0.1806,0.8519,0.3114,0.0036,0.660975
+84,C · LogReg / CatBoost,46,cw,lightgbm,isotonic,0.8506,0.1077,0.544,0.1798,0.8519,0.3116,0.0037,0.6607500000000001
+85,C · LogReg / CatBoost,47,smote,lightgbm,platt,0.8427,0.1553,0.4496,0.2309,0.8378,0.3281,0.0269,0.66075
+86,C · LogReg / CatBoost,48,smotenc,lightgbm,platt,0.8427,0.1553,0.4496,0.2309,0.8378,0.3281,0.0269,0.66075
+87,C · LogReg / CatBoost,49,smotecw,lightgbm,platt,0.8427,0.1553,0.4496,0.2309,0.8378,0.3281,0.0269,0.66075
+88,C · LogReg / CatBoost,50,smotencw,lightgbm,platt,0.8427,0.1553,0.4496,0.2309,0.8378,0.3281,0.0269,0.66075
+89,A · KNN / RF,17,smote,randomforest,platt,0.8423,0.1486,0.4438,0.2226,0.8347,0.3297,0.0281,0.658275
+90,A · KNN / RF,18,smotenc,randomforest,platt,0.8423,0.1486,0.4438,0.2226,0.8347,0.3297,0.0281,0.658275
+91,A · KNN / RF,19,smotecw,randomforest,platt,0.842,0.1484,0.4414,0.2221,0.8346,0.3296,0.0287,0.658025
+92,A · KNN / RF,20,smotencw,randomforest,platt,0.842,0.1484,0.4414,0.2221,0.8346,0.3296,0.0287,0.658025
+93,B · XGBoost / AdaBoost,23,cw,xgboost,venn_abers,0.8484,0.0979,0.5073,0.1641,0.8469,0.314,0.0035,0.6572
+94,C · LogReg / CatBoost,51,smote,catboost,platt,0.8469,0.1196,0.4854,0.192,0.8375,0.3233,0.0144,0.6572
+95,C · LogReg / CatBoost,52,smotenc,catboost,platt,0.8469,0.1196,0.4854,0.192,0.8375,0.3233,0.0144,0.6572
+96,C · LogReg / CatBoost,53,smotecw,catboost,platt,0.8469,0.1196,0.4854,0.192,0.8375,0.3233,0.0144,0.6572
+97,C · LogReg / CatBoost,54,smotencw,catboost,platt,0.8469,0.1196,0.4854,0.192,0.8375,0.3233,0.0144,0.6572
+98,B · XGBoost / AdaBoost,24,cw,xgboost,isotonic,0.8483,0.0972,0.5057,0.1631,0.8469,0.3136,0.0039,0.657
+99,C · LogReg / CatBoost,55,cw,lightgbm,platt,0.8499,0.0822,0.5408,0.1427,0.8522,0.3126,0.0067,0.6532
+100,A · KNN / RF,21,base,knn,platt,0.8436,0.1451,0.4553,0.2201,0.8232,0.3458,0.0381,0.6512
+101,A · KNN / RF,22,cw,knn,platt,0.8436,0.1451,0.4553,0.2201,0.8232,0.3458,0.0381,0.6512
+102,A · KNN / RF,23,base,knn,isotonic,0.8466,0.0896,0.4769,0.1509,0.8232,0.3308,0.004,0.65035
+103,A · KNN / RF,24,cw,knn,isotonic,0.8466,0.0896,0.4769,0.1509,0.8232,0.3308,0.004,0.65035
+104,A · KNN / RF,25,smotecw,randomforest,isotonic,0.8464,0.0679,0.4636,0.1184,0.8341,0.3198,0.0052,0.647325
+105,A · KNN / RF,26,smotencw,randomforest,isotonic,0.8464,0.0679,0.4636,0.1184,0.8341,0.3198,0.0052,0.647325
+106,A · KNN / RF,27,smotecw,randomforest,venn_abers,0.8465,0.0685,0.466,0.1195,0.8341,0.3198,0.006,0.6473
+107,A · KNN / RF,28,smotencw,randomforest,venn_abers,0.8465,0.0685,0.466,0.1195,0.8341,0.3198,0.006,0.6473
+108,A · KNN / RF,29,base,knn,venn_abers,0.8466,0.0896,0.4769,0.1509,0.8191,0.3358,0.0137,0.646675
+109,A · KNN / RF,30,cw,knn,venn_abers,0.8466,0.0896,0.4769,0.1509,0.8191,0.3358,0.0137,0.646675
+110,C · LogReg / CatBoost,56,smote,lightgbm,isotonic,0.8469,0.0583,0.4727,0.1038,0.8375,0.318,0.0042,0.64575
+111,C · LogReg / CatBoost,57,smotenc,lightgbm,isotonic,0.8469,0.0583,0.4727,0.1038,0.8375,0.318,0.0042,0.64575
+112,C · LogReg / CatBoost,58,smotecw,lightgbm,isotonic,0.8469,0.0583,0.4727,0.1038,0.8375,0.318,0.0042,0.64575
+113,C · LogReg / CatBoost,59,smotencw,lightgbm,isotonic,0.8469,0.0583,0.4727,0.1038,0.8375,0.318,0.0042,0.64575
+114,C · LogReg / CatBoost,60,smote,lightgbm,venn_abers,0.8469,0.0587,0.4712,0.1044,0.8375,0.318,0.0049,0.645675
+115,C · LogReg / CatBoost,61,smotenc,lightgbm,venn_abers,0.8469,0.0587,0.4712,0.1044,0.8375,0.318,0.0049,0.645675
+116,C · LogReg / CatBoost,62,smotecw,lightgbm,venn_abers,0.8469,0.0587,0.4712,0.1044,0.8375,0.318,0.0049,0.645675
+117,C · LogReg / CatBoost,63,smotencw,lightgbm,venn_abers,0.8469,0.0587,0.4712,0.1044,0.8375,0.318,0.0049,0.645675
+118,D · Naïve Bayes,1,base,naive_bayes,base,0.7463,0.73,0.3429,0.4666,0.8075,0.7084,0.1859,0.6455
+119,D · Naïve Bayes,2,cw,naive_bayes,base,0.7463,0.73,0.3429,0.4666,0.8075,0.7084,0.1859,0.6455
+120,B · XGBoost / AdaBoost,25,smote,adaboost,platt,0.8449,0.0827,0.4455,0.1394,0.8306,0.329,0.0186,0.645
+121,B · XGBoost / AdaBoost,26,smotenc,adaboost,platt,0.8449,0.0827,0.4455,0.1394,0.8306,0.329,0.0186,0.645
+122,B · XGBoost / AdaBoost,27,smotecw,adaboost,platt,0.8449,0.0827,0.4455,0.1394,0.8306,0.329,0.0186,0.645
+123,B · XGBoost / AdaBoost,28,smotencw,adaboost,platt,0.8449,0.0827,0.4455,0.1394,0.8306,0.329,0.0186,0.645
+124,A · KNN / RF,31,smote,randomforest,venn_abers,0.8471,0.0518,0.4741,0.0934,0.8341,0.3198,0.0064,0.643175
+125,A · KNN / RF,32,smotenc,randomforest,venn_abers,0.8471,0.0518,0.4741,0.0934,0.8341,0.3198,0.0064,0.643175
+126,A · KNN / RF,33,smote,randomforest,isotonic,0.8471,0.0511,0.4747,0.0923,0.834,0.3197,0.0061,0.6431
+127,A · KNN / RF,34,smotenc,randomforest,isotonic,0.8471,0.0511,0.4747,0.0923,0.834,0.3197,0.0061,0.6431
+128,C · LogReg / CatBoost,64,smote,catboost,isotonic,0.848,0.0476,0.5011,0.087,0.8372,0.3189,0.006,0.642675
+129,C · LogReg / CatBoost,65,smotenc,catboost,isotonic,0.848,0.0476,0.5011,0.087,0.8372,0.3189,0.006,0.642675
+130,C · LogReg / CatBoost,66,smotecw,catboost,isotonic,0.848,0.0476,0.5011,0.087,0.8372,0.3189,0.006,0.642675
+131,C · LogReg / CatBoost,67,smotencw,catboost,isotonic,0.848,0.0476,0.5011,0.087,0.8372,0.3189,0.006,0.642675
+132,C · LogReg / CatBoost,68,smote,catboost,venn_abers,0.848,0.0479,0.5011,0.0874,0.8373,0.319,0.0065,0.6426000000000001
+133,C · LogReg / CatBoost,69,smotenc,catboost,venn_abers,0.848,0.0479,0.5011,0.0874,0.8373,0.319,0.0065,0.6426000000000001
+134,C · LogReg / CatBoost,70,smotecw,catboost,venn_abers,0.848,0.0479,0.5011,0.0874,0.8373,0.319,0.0065,0.6426000000000001
+135,C · LogReg / CatBoost,71,smotencw,catboost,venn_abers,0.848,0.0479,0.5011,0.0874,0.8373,0.319,0.0065,0.6426000000000001
+136,A · KNN / RF,35,smote,knn,platt,0.8433,0.0757,0.4153,0.1281,0.8203,0.3347,0.0175,0.6416999999999999
+137,A · KNN / RF,36,smotenc,knn,platt,0.8433,0.0757,0.4153,0.1281,0.8203,0.3347,0.0175,0.6416999999999999
+138,A · KNN / RF,37,smotecw,knn,platt,0.8433,0.0757,0.4153,0.1281,0.8203,0.3347,0.0175,0.6416999999999999
+139,A · KNN / RF,38,smotencw,knn,platt,0.8433,0.0757,0.4153,0.1281,0.8203,0.3347,0.0175,0.6416999999999999
+140,D · Naïve Bayes,3,smote,naive_bayes,venn_abers,0.8493,0.0594,0.5395,0.107,0.7954,0.3492,0.0038,0.638925
+141,D · Naïve Bayes,4,smotenc,naive_bayes,venn_abers,0.8493,0.0594,0.5395,0.107,0.7954,0.3492,0.0038,0.638925
+142,D · Naïve Bayes,5,smotecw,naive_bayes,venn_abers,0.8493,0.0594,0.5395,0.107,0.7954,0.3492,0.0038,0.638925
+143,D · Naïve Bayes,6,smotencw,naive_bayes,venn_abers,0.8493,0.0594,0.5395,0.107,0.7954,0.3492,0.0038,0.638925
+144,D · Naïve Bayes,7,smote,naive_bayes,isotonic,0.8493,0.0594,0.5406,0.107,0.7953,0.3493,0.0039,0.6388750000000001
+145,D · Naïve Bayes,8,smotenc,naive_bayes,isotonic,0.8493,0.0594,0.5406,0.107,0.7953,0.3493,0.0039,0.6388750000000001
+146,D · Naïve Bayes,9,smotecw,naive_bayes,isotonic,0.8493,0.0594,0.5406,0.107,0.7953,0.3493,0.0039,0.6388750000000001
+147,D · Naïve Bayes,10,smotencw,naive_bayes,isotonic,0.8493,0.0594,0.5406,0.107,0.7953,0.3493,0.0039,0.6388750000000001
+148,B · XGBoost / AdaBoost,29,smote,xgboost,venn_abers,0.8477,0.0176,0.4793,0.034,0.8374,0.3185,0.0036,0.6357999999999999
+149,B · XGBoost / AdaBoost,30,smotenc,xgboost,venn_abers,0.8477,0.0176,0.4793,0.034,0.8374,0.3185,0.0036,0.6357999999999999
+150,B · XGBoost / AdaBoost,31,smotecw,xgboost,venn_abers,0.8477,0.0176,0.4793,0.034,0.8374,0.3185,0.0036,0.6357999999999999
+151,B · XGBoost / AdaBoost,32,smotencw,xgboost,venn_abers,0.8477,0.0176,0.4793,0.034,0.8374,0.3185,0.0036,0.6357999999999999
+152,B · XGBoost / AdaBoost,33,smote,xgboost,isotonic,0.8476,0.017,0.4699,0.0328,0.8374,0.3198,0.0043,0.635125
+153,B · XGBoost / AdaBoost,34,smotenc,xgboost,isotonic,0.8476,0.017,0.4699,0.0328,0.8374,0.3198,0.0043,0.635125
+154,B · XGBoost / AdaBoost,35,smotecw,xgboost,isotonic,0.8476,0.017,0.4699,0.0328,0.8374,0.3198,0.0043,0.635125
+155,B · XGBoost / AdaBoost,36,smotencw,xgboost,isotonic,0.8476,0.017,0.4699,0.0328,0.8374,0.3198,0.0043,0.635125
+156,A · KNN / RF,39,base,knn,base,0.8466,0.0896,0.4769,0.1509,0.8232,0.3823,0.0142,0.6349250000000001
+157,A · KNN / RF,40,cw,knn,base,0.8466,0.0896,0.4769,0.1509,0.8232,0.3823,0.0142,0.6349250000000001
+158,B · XGBoost / AdaBoost,37,smote,adaboost,venn_abers,0.8477,0.0017,0.3478,0.0035,0.8304,0.3217,0.0028,0.631225
+159,B · XGBoost / AdaBoost,38,smotenc,adaboost,venn_abers,0.8477,0.0017,0.3478,0.0035,0.8304,0.3217,0.0028,0.631225
+160,B · XGBoost / AdaBoost,39,smotecw,adaboost,venn_abers,0.8477,0.0017,0.3478,0.0035,0.8304,0.3217,0.0028,0.631225
+161,B · XGBoost / AdaBoost,40,smotencw,adaboost,venn_abers,0.8477,0.0017,0.3478,0.0035,0.8304,0.3217,0.0028,0.631225
+162,B · XGBoost / AdaBoost,41,smote,adaboost,isotonic,0.8477,0.0015,0.3182,0.003,0.8301,0.3216,0.0029,0.6311749999999999
+163,B · XGBoost / AdaBoost,42,smotenc,adaboost,isotonic,0.8477,0.0015,0.3182,0.003,0.8301,0.3216,0.0029,0.6311749999999999
+164,B · XGBoost / AdaBoost,43,smotecw,adaboost,isotonic,0.8477,0.0015,0.3182,0.003,0.8301,0.3216,0.0029,0.6311749999999999
+165,B · XGBoost / AdaBoost,44,smotencw,adaboost,isotonic,0.8477,0.0015,0.3182,0.003,0.8301,0.3216,0.0029,0.6311749999999999
+166,B · XGBoost / AdaBoost,45,cw,adaboost,venn_abers,0.848,0.0,0.0,0.0,0.8226,0.3236,0.0006,0.63095
+167,B · XGBoost / AdaBoost,46,cw,adaboost,isotonic,0.848,0.0,0.0,0.0,0.8226,0.3236,0.0007,0.630925
+168,A · KNN / RF,41,smote,knn,isotonic,0.848,0.0094,0.5119,0.0184,0.8199,0.331,0.0078,0.62965
+169,A · KNN / RF,42,smotenc,knn,isotonic,0.848,0.0094,0.5119,0.0184,0.8199,0.331,0.0078,0.62965
+170,A · KNN / RF,43,smotecw,knn,isotonic,0.848,0.0094,0.5119,0.0184,0.8199,0.331,0.0078,0.62965
+171,A · KNN / RF,44,smotencw,knn,isotonic,0.848,0.0094,0.5119,0.0184,0.8199,0.331,0.0078,0.62965
+172,A · KNN / RF,45,smote,knn,venn_abers,0.848,0.0096,0.5057,0.0188,0.8199,0.3311,0.0081,0.6295999999999999
+173,A · KNN / RF,46,smotenc,knn,venn_abers,0.848,0.0096,0.5057,0.0188,0.8199,0.3311,0.0081,0.6295999999999999
+174,A · KNN / RF,47,smotecw,knn,venn_abers,0.848,0.0096,0.5057,0.0188,0.8199,0.3311,0.0081,0.6295999999999999
+175,A · KNN / RF,48,smotencw,knn,venn_abers,0.848,0.0096,0.5057,0.0188,0.8199,0.3311,0.0081,0.6295999999999999
+176,C · LogReg / CatBoost,72,base,catboost,base,0.8498,0.0331,0.608,0.0627,0.8483,0.3284,0.0391,0.6288499999999999
+177,D · Naïve Bayes,11,base,naive_bayes,isotonic,0.848,0.0,0.0,0.0,0.8091,0.3411,0.0024,0.626125
+178,D · Naïve Bayes,12,cw,naive_bayes,isotonic,0.848,0.0,0.0,0.0,0.8091,0.3411,0.0024,0.626125
+179,D · Naïve Bayes,13,base,naive_bayes,venn_abers,0.848,0.0,0.0,0.0,0.8091,0.3411,0.0041,0.6257
+180,D · Naïve Bayes,14,cw,naive_bayes,venn_abers,0.848,0.0,0.0,0.0,0.8091,0.3411,0.0041,0.6257
+181,B · XGBoost / AdaBoost,47,cw,adaboost,platt,0.848,0.0,0.0,0.0,0.8226,0.3346,0.0169,0.624125
+182,B · XGBoost / AdaBoost,48,base,adaboost,base,0.8489,0.184,0.5081,0.2702,0.8456,0.4062,0.1388,0.621975
+183,D · Naïve Bayes,15,base,naive_bayes,platt,0.848,0.0,0.0,0.0,0.8075,0.3488,0.0154,0.62095
+184,D · Naïve Bayes,16,cw,naive_bayes,platt,0.848,0.0,0.0,0.0,0.8075,0.3488,0.0154,0.62095
+185,D · Naïve Bayes,17,smote,naive_bayes,platt,0.848,0.0,0.0,0.0,0.7922,0.3536,0.0116,0.6206999999999999
+186,D · Naïve Bayes,18,smotenc,naive_bayes,platt,0.848,0.0,0.0,0.0,0.7922,0.3536,0.0116,0.6206999999999999
+187,D · Naïve Bayes,19,smotecw,naive_bayes,platt,0.848,0.0,0.0,0.0,0.7922,0.3536,0.0116,0.6206999999999999
+188,D · Naïve Bayes,20,smotencw,naive_bayes,platt,0.848,0.0,0.0,0.0,0.7922,0.3536,0.0116,0.6206999999999999
+189,D · Naïve Bayes,21,smote,naive_bayes,base,0.7309,0.7451,0.3296,0.457,0.7922,0.7991,0.212,0.616225
+190,D · Naïve Bayes,22,smotenc,naive_bayes,base,0.7309,0.7451,0.3296,0.457,0.7922,0.7991,0.212,0.616225
+191,D · Naïve Bayes,23,smotecw,naive_bayes,base,0.7309,0.7451,0.3296,0.457,0.7922,0.7991,0.212,0.616225
+192,D · Naïve Bayes,24,smotencw,naive_bayes,base,0.7309,0.7451,0.3296,0.457,0.7922,0.7991,0.212,0.616225
